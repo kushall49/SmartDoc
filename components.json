@@ -1,0 +1,9 @@
+const config = {
+  tailwindcss: {
+    animate: {
+      version: "latest"
+    }
+  }
+};
+
+module.exports = config;

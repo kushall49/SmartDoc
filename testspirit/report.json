@@ -1,0 +1,52 @@
+﻿{
+    "summary":  {
+                    "totalWarnings":  23,
+                    "totalErrors":  0,
+                    "critical":  0
+                },
+    "timestamp":  "2025-12-02 02:00:43",
+    "checks":  [
+                   {
+                       "status":  "pass",
+                       "name":  "TypeScript",
+                       "errors":  0
+                   },
+                   {
+                       "status":  "pass",
+                       "name":  "ESLint",
+                       "warnings":  0,
+                       "errors":  0
+                   },
+                   {
+                       "todos":  2,
+                       "status":  "info",
+                       "name":  "Code Issues",
+                       "consoleLogs":  21
+                   },
+                   {
+                       "status":  "info",
+                       "anyTypes":  4,
+                       "name":  "Potential Issues",
+                       "emptyCatch":  0
+                   },
+                   {
+                       "awaitCalls":  157,
+                       "status":  "info",
+                       "asyncFunctions":  74,
+                       "name":  "Async/Await"
+                   },
+                   {
+                       "status":  "info",
+                       "handlers":  24,
+                       "name":  "API Routes",
+                       "routes":  8
+                   },
+                   {
+                       "status":  "info",
+                       "largeFiles":  1,
+                       "name":  "Performance",
+                       "useStates":  42,
+                       "useEffects":  15
+                   }
+               ]
+}
