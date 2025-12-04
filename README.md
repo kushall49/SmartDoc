@@ -171,7 +171,7 @@ MIT License - feel free to use this project for learning and portfolio purposes.
 
 ## 👤 Author
 
-Built by [Your Name] as a portfolio project showcasing:
+Built by Kushal L as a portfolio project showcasing:
 - Full-stack development
 - AI/ML integration
 - Cloud architecture
@@ -180,3 +180,4 @@ Built by [Your Name] as a portfolio project showcasing:
 ---
 
 ⭐ If this project helps you, consider giving it a star!
+
