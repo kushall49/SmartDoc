@@ -1,52 +1,67 @@
-import mongoose, { Schema, Model } from 'mongoose';
-import { User } from '@/types';
+import mongoose, { Schema, Document, model, models } from 'mongoose';
+import bcrypt from 'bcryptjs';
 
-const UserSchema = new Schema<User>(
+export interface IUser extends Document {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  email: string;
+  password?: string;
+  image?: string;
+  role: 'user' | 'admin';
+  tokensUsedToday: number;
+  tokensResetAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  comparePassword(candidate: string): Promise<boolean>;
+}
+
+const UserSchema = new Schema<IUser>(
   {
-    name: {
-      type: String,
-      required: [true, 'Name is required'],
-      trim: true,
-      minlength: [2, 'Name must be at least 2 characters'],
-      maxlength: [100, 'Name must be less than 100 characters'],
-    },
+    name: { type: String, required: true, trim: true, minlength: 2, maxlength: 100 },
     email: {
       type: String,
-      required: [true, 'Email is required'],
+      required: true,
       unique: true,
       lowercase: true,
       trim: true,
-      match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email address'],
+      match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Invalid email address'],
     },
-    password: {
-      type: String,
-      required: [true, 'Password is required'],
-      minlength: [8, 'Password must be at least 8 characters'],
-      select: false, // Don't return password by default
-    },
-    role: {
-      type: String,
-      enum: ['user', 'admin'],
-      default: 'user',
-    },
+    password: { type: String, minlength: 8, select: false },
+    image: { type: String },
+    role: { type: String, enum: ['user', 'admin'], default: 'user' },
+    tokensUsedToday: { type: Number, default: 0 },
+    tokensResetAt: { type: Date, default: Date.now },
   },
   {
     timestamps: true,
     toJSON: {
-      transform: (_, ret) => {
-        (ret as any).id = ret._id;
-        delete (ret as any).__v;
-        delete (ret as any).password;
+      transform: (_doc, ret: Record<string, unknown>) => {
+        const rawId = ret._id;
+        ret.id = rawId != null ? String(rawId) : undefined;
+        delete ret._id;
+        delete ret.__v;
+        delete ret.password;
         return ret;
       },
     },
   }
 );
 
-// Index for faster queries
-UserSchema.index({ email: 1 });
+UserSchema.index({ email: 1 }, { unique: true });
+UserSchema.index({ tokensResetAt: 1 });
 
-// Prevent model recompilation in development
-const UserModel: Model<User> = mongoose.models.User || mongoose.model<User>('User', UserSchema);
+UserSchema.pre('save', async function (next) {
+  if (this.isModified('password') && this.password) {
+    this.password = await bcrypt.hash(this.password, 12);
+  }
+  next();
+});
 
-export default UserModel;
+UserSchema.methods.comparePassword = async function (
+  candidate: string
+): Promise<boolean> {
+  if (!this.password) return false;
+  return bcrypt.compare(candidate, this.password);
+};
+
+export const User = (models.User as mongoose.Model<IUser>) ?? model<IUser>('User', UserSchema);

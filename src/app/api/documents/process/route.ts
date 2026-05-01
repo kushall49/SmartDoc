@@ -1,72 +1,53 @@
-import { NextRequest, NextResponse } from 'next/server';
-import connectDB from '@/lib/db';
-import DocumentModel from '@/models/Document';
-import { handleApiError } from '@/lib/errors';
-import { logger } from '@/lib/logger';
+import { NextRequest } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { connectDB } from '@/lib/db';
+import { DocumentModel } from '@/models/Document';
+import { addDocumentToQueue } from '@/services/queue.service';
+import { ok, err, unauthorized, notFound, serverError } from '@/lib/api-response';
+import { z } from 'zod';
+import mongoose from 'mongoose';
 
-/**
- * POST /api/documents/process
- * Mark document as ready for processing (immediate processing without queue)
- */
+const schema = z.object({
+  documentId: z.string().min(1),
+});
+
 export async function POST(request: NextRequest) {
   try {
-    await connectDB();
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) return unauthorized();
 
     const body = await request.json();
-    const { documentId } = body;
+    const parsed = schema.safeParse(body);
+    if (!parsed.success)
+      return err(parsed.error.issues[0]?.message ?? 'Invalid request');
 
-    if (!documentId) {
-      return NextResponse.json(
-        { success: false, error: 'Document ID is required' },
-        { status: 400 }
-      );
-    }
+    const { documentId } = parsed.data;
 
-    // Get document
-    const document = await DocumentModel.findById(documentId);
-
-    if (!document) {
-      return NextResponse.json(
-        { success: false, error: 'Document not found' },
-        { status: 404 }
-      );
-    }
-
-    // Update status to processing (simulating immediate processing)
-    await DocumentModel.findByIdAndUpdate(documentId, {
-      'status.stage': 'processing',
-      'status.progress': 50,
-      'status.message': 'Processing document...',
-      'status.startedAt': new Date(),
+    await connectDB();
+    const doc = await DocumentModel.findOne({
+      _id: documentId,
+      userId: new mongoose.Types.ObjectId(session.user.id),
     });
+    if (!doc) return notFound('Document');
 
-    // Simulate completion immediately (in real production, process in background)
-    setTimeout(async () => {
-      try {
-        await DocumentModel.findByIdAndUpdate(documentId, {
-          'status.stage': 'completed',
-          'status.progress': 100,
-          'status.message': 'Processing completed',
-          'status.completedAt': new Date(),
-        });
-        logger.info('Document processing completed', { documentId });
-      } catch (err) {
-        logger.error('Failed to complete document processing', err as Error);
+    // Allow re-processing of failed documents
+    if (doc.status === 'processing') {
+      return err('Document is already being processed');
+    }
+
+    const jobId = await addDocumentToQueue(documentId);
+    await DocumentModel.updateOne(
+      { _id: documentId },
+      {
+        status: 'pending',
+        processingJobId: jobId,
+        errorMessage: undefined,
       }
-    }, 2000);
-
-    logger.info('Document marked for processing', { documentId });
-
-    return NextResponse.json({
-      success: true,
-      message: 'Document processing started',
-      documentId,
-    });
-  } catch (error) {
-    const { error: errorMessage, statusCode } = handleApiError(error);
-    return NextResponse.json(
-      { success: false, error: errorMessage },
-      { status: statusCode }
     );
+
+    return ok({ documentId, jobId, status: 'pending' });
+  } catch (e) {
+    return serverError(e);
   }
 }

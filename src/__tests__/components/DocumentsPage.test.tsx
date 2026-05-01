@@ -3,18 +3,23 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import DocumentsPage from '@/app/dashboard/documents/page';
 
-// Mock dependencies
-jest.mock('next-auth/react');
+// Mock dependencies — provide a factory so useSession is a jest.fn() that can be overridden
+jest.mock('next-auth/react', () => ({
+  useSession: jest.fn(),
+  signIn: jest.fn(),
+  signOut: jest.fn(),
+}));
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
   usePathname: jest.fn(),
 }));
 
-jest.mock('@/hooks/use-toast', () => ({
-  useToast: () => ({
-    toast: jest.fn(),
-  }),
-}));
+// Stable toast mock — same function reference across renders so useCallback
+// dependencies don't thrash and trigger infinite fetch re-executions.
+jest.mock('@/hooks/use-toast', () => {
+  const mockToastFn = jest.fn();
+  return { useToast: () => ({ toast: mockToastFn }) };
+});
 
 global.fetch = jest.fn();
 
@@ -33,7 +38,9 @@ describe('Documents Page', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    // resetAllMocks (not clearAllMocks) to also wipe any persistent mockImplementation
+    // left over from tests like "should show loading state" that use never-resolving promises.
+    jest.resetAllMocks();
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
     (useSession as jest.Mock).mockReturnValue({ data: mockSession });
   });
@@ -112,7 +119,9 @@ describe('Documents Page', () => {
   });
 
   it('should handle empty documents list', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    // Use mockResolvedValue (not Once) so repeated fetch calls from
+    // unstable dependencies all return the same safe empty result.
+    (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: async () => ({ success: true, documents: [] }),
     });

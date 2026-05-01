@@ -1,150 +1,99 @@
-import { NextRequest, NextResponse } from 'next/server';
-import connectDB from '@/lib/db';
-import DocumentModel from '@/models/Document';
-import { uploadToS3, generateS3Key, getContentType, getFileExtension } from '@/utils/s3';
-import { validateFileSize, validateFileType, sanitizeFilename } from '@/utils/file';
-import { handleApiError, ValidationError } from '@/lib/errors';
+import { NextRequest } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { connectDB } from '@/lib/db';
+import { DocumentModel } from '@/models/Document';
+import { uploadFile, validateFile } from '@/services/s3.service';
+import { addDocumentToQueue } from '@/services/queue.service';
+import { ok, err, unauthorized, serverError } from '@/lib/api-response';
+import { checkApiRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
-import fs from 'fs';
-import path from 'path';
+import mongoose from 'mongoose';
 
-export const config = {
-  api: {
-    bodyParser: false, // Disable default body parser for file uploads
-  },
-};
+// Generate a unique file key scoped to the user
+function buildS3Key(userId: string, originalName: string): string {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).slice(2, 8);
+  const ext = originalName.split('.').pop() ?? '';
+  return `documents/${userId}/${timestamp}-${random}${ext ? '.' + ext : ''}`;
+}
 
-/**
- * POST /api/documents/upload
- * Upload a document file to S3 and create a database record
- */
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) return unauthorized();
+
+    const rateLimitOk = await checkApiRateLimit(session.user.id);
+    if (!rateLimitOk) return err('Rate limit exceeded. Please slow down.', 429);
+
+    const formData = await request.formData();
+    const file = formData.get('file') as File | null;
+
+    if (!file) return err('No file provided');
+
+    const validationError = validateFile({
+      name: file.name,
+      type: file.type,
+      size: file.size,
+    });
+    if (validationError) return err(validationError);
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const s3Key = buildS3Key(session.user.id, file.name);
+
     await connectDB();
 
-    // Get the form data
-    const formData = await request.formData();
-    const file = formData.get('file') as File;
-    const userId = formData.get('userId') as string; // In production, get from session/auth
-
-    if (!file) {
-      throw new ValidationError('No file provided');
-    }
-
-    if (!userId) {
-      throw new ValidationError('User ID is required');
-    }
-
-    // Validate file
-    validateFileSize(file.size);
-    validateFileType(file.name, file.type);
-
-    // Sanitize filename
-    const sanitizedFilename = sanitizeFilename(file.name);
-    const extension = getFileExtension(sanitizedFilename);
-    const contentType = getContentType(extension);
-
-    // Convert file to buffer
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // Generate S3 key and upload
-    const s3Key = generateS3Key(userId, sanitizedFilename);
-    
-    // Try to upload to S3, fallback to local storage if S3 is not available
-    let s3Url: string;
-    try {
-      s3Url = await uploadToS3(buffer, s3Key, contentType);
-    } catch (s3Error) {
-      // S3 not available, use local path instead
-      logger.warn('S3 upload failed, using local storage');
-      s3Url = `/uploads/${s3Key}`;
-      
-      // Save file locally in development (you need to create S3 bucket for production)
-      const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'documents', userId);
-      
-      // Create directory if it doesn't exist
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-      }
-      
-      const localFilePath = path.join(uploadDir, path.basename(s3Key));
-      fs.writeFileSync(localFilePath, buffer);
-      
-      logger.info('File saved locally', { path: localFilePath });
-    }
-
-    // Create document record in database
-    const document = await DocumentModel.create({
-      userId,
-      filename: sanitizedFilename,
+    // Create document record (status: uploading)
+    const doc = await DocumentModel.create({
+      userId: new mongoose.Types.ObjectId(session.user.id),
+      name: file.name.replace(/\.[^/.]+$/, ''),
       originalName: file.name,
-      fileType: extension,
+      mimeType: file.type,
+      sizeBytes: file.size,
+      // Legacy compat fields
+      filename: file.name,
+      fileType: file.name.split('.').pop()?.toLowerCase() ?? '',
       fileSize: file.size,
       s3Key,
-      s3Url,
-      status: {
-        stage: 'uploaded',
-        progress: 0,
-        message: 'File uploaded successfully',
-      },
+      s3Url: '',
+      status: 'uploading',
     });
 
-    logger.info('Document uploaded successfully', {
-      documentId: document._id,
-      userId,
-      filename: sanitizedFilename,
+    // Upload file to S3 or local
+    const s3Url = await uploadFile(s3Key, buffer, file.type);
+    await DocumentModel.updateOne({ _id: doc._id }, { s3Url, status: 'pending' });
+
+    // Queue async processing
+    const jobId = await addDocumentToQueue(doc._id.toString());
+    await DocumentModel.updateOne({ _id: doc._id }, { processingJobId: jobId });
+
+    logger.info('Document uploaded and queued', {
+      documentId: doc._id,
+      name: doc.name,
+      jobId,
     });
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: 'File uploaded successfully',
-        document: {
-          id: document._id,
-          filename: document.filename,
-          fileType: document.fileType,
-          fileSize: document.fileSize,
-          status: document.status,
-          createdAt: document.createdAt,
-        },
-      },
-      { status: 201 }
-    );
-  } catch (error) {
-    const { error: errorMessage, statusCode } = handleApiError(error);
-    logger.error('Document upload failed', error as Error);
-    
-    return NextResponse.json(
-      { success: false, error: errorMessage },
-      { status: statusCode }
-    );
+    return ok({
+      documentId: doc._id.toString(),
+      jobId,
+      name: doc.name,
+      status: 'pending',
+    });
+  } catch (e) {
+    logger.error('Upload error', { error: String(e) });
+    return serverError(e);
   }
 }
 
-/**
- * GET /api/documents/upload
- * Get upload configuration and limits
- */
 export async function GET() {
-  try {
-    const { UPLOAD_CONFIG } = await import('@/lib/config');
-
-    return NextResponse.json({
-      success: true,
-      config: {
-        maxFileSize: UPLOAD_CONFIG.maxFileSize,
-        maxFileSizeMB: UPLOAD_CONFIG.maxFileSize / (1024 * 1024),
-        allowedFileTypes: UPLOAD_CONFIG.allowedFileTypes,
-        allowedMimeTypes: UPLOAD_CONFIG.allowedMimeTypes,
-      },
-    });
-  } catch (error) {
-    const { error: errorMessage, statusCode } = handleApiError(error);
-    
-    return NextResponse.json(
-      { success: false, error: errorMessage },
-      { status: statusCode }
-    );
-  }
+  return ok({
+    maxFileSizeMb: parseInt(process.env.MAX_FILE_SIZE_MB ?? '10'),
+    allowedTypes: (process.env.ALLOWED_FILE_TYPES ?? 'pdf,png,jpg,jpeg,docx').split(','),
+    allowedMimeTypes: [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'image/jpeg',
+      'image/png',
+    ],
+  });
 }

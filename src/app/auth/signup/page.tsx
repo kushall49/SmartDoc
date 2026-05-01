@@ -1,206 +1,159 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import Link from 'next/link';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2, CheckCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useState, FormEvent } from 'react';
+import { Zap, User, Mail, Lock, AlertCircle } from 'lucide-react';
 
 export default function SignUpPage() {
   const router = useRouter();
-  const { toast } = useToast();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-
-    // Validate passwords match
-    if (formData.password !== formData.confirmPassword) {
-      toast({
-        title: 'Passwords do not match',
-        description: 'Please make sure both passwords are the same',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Validate password length
-    if (formData.password.length < 8) {
-      toast({
-        title: 'Password too short',
-        description: 'Password must be at least 8 characters',
-        variant: 'destructive',
-      });
-      return;
-    }
-
+    setError('');
     setLoading(true);
-
     try {
-      const response = await fetch('/api/auth/register', {
+      const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-        }),
+        body: JSON.stringify({ name, email, password }),
       });
+      const data = await res.json();
 
-      const data = await response.json();
+      if (!data.success) {
+        setError(data.error ?? 'Registration failed');
+        return;
+      }
 
-      if (data.success) {
-        toast({
-          title: 'Account created!',
-          description: 'Your account has been created successfully. Please sign in.',
-        });
+      // Auto sign in after registration
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      });
+      if (result?.error) {
         router.push('/auth/signin');
       } else {
-        toast({
-          title: 'Sign up failed',
-          description: data.error || 'An error occurred',
-          variant: 'destructive',
-        });
+        router.push('/dashboard');
       }
-    } catch (error) {
-      toast({
-        title: 'Sign up failed',
-        description: 'An unexpected error occurred',
-        variant: 'destructive',
-      });
+    } catch {
+      setError('Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
-  };
-
-  const passwordRequirements = [
-    { met: formData.password.length >= 8, text: 'At least 8 characters' },
-    { met: /[A-Z]/.test(formData.password), text: 'One uppercase letter' },
-    { met: /[a-z]/.test(formData.password), text: 'One lowercase letter' },
-    { met: /[0-9]/.test(formData.password), text: 'One number' },
-  ];
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center space-x-2 mb-6">
-            <span className="text-4xl">🧠</span>
-            <span className="font-bold text-2xl">SmartDocIQ</span>
-          </Link>
-          <h1 className="text-3xl font-bold tracking-tight">Create an account</h1>
-          <p className="text-muted-foreground mt-2">Get started with SmartDocIQ</p>
+        <div className="flex items-center justify-center gap-3 mb-8">
+          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
+            <Zap size={20} className="text-white" />
+          </div>
+          <span className="text-white font-bold text-2xl">SmartDocIQ</span>
         </div>
 
-        <Card>
-          <form onSubmit={handleSubmit}>
-            <CardHeader>
-              <CardTitle>Sign Up</CardTitle>
-              <CardDescription>Create a new account to access the platform</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
-                <Input
-                  id="name"
-                  type="text"
-                  placeholder="John Doe"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                  disabled={loading}
-                  minLength={2}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  required
-                  disabled={loading}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  required
-                  disabled={loading}
-                  minLength={8}
-                />
-                {formData.password && (
-                  <div className="space-y-1 pt-2">
-                    {passwordRequirements.map((req, index) => (
-                      <div
-                        key={index}
-                        className={`flex items-center gap-2 text-xs ${
-                          req.met ? 'text-green-600' : 'text-muted-foreground'
-                        }`}
-                      >
-                        <CheckCircle
-                          className={`h-3 w-3 ${req.met ? 'opacity-100' : 'opacity-30'}`}
-                        />
-                        {req.text}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  placeholder="••••••••"
-                  value={formData.confirmPassword}
-                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                  required
-                  disabled={loading}
-                />
-              </div>
-            </CardContent>
-            <CardFooter className="flex flex-col space-y-4">
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating account...
-                  </>
-                ) : (
-                  'Create Account'
-                )}
-              </Button>
-              <p className="text-sm text-center text-muted-foreground">
-                Already have an account?{' '}
-                <Link href="/auth/signin" className="text-primary hover:underline font-medium">
-                  Sign in
-                </Link>
-              </p>
-            </CardFooter>
-          </form>
-        </Card>
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8">
+          <h1 className="text-2xl font-bold text-white mb-1">Create an account</h1>
+          <p className="text-slate-400 text-sm mb-6">
+            Start analyzing documents with AI
+          </p>
 
-        <p className="text-xs text-center text-muted-foreground mt-4">
-          By creating an account, you agree to our Terms of Service and Privacy Policy
-        </p>
+          {error && (
+            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg px-4 py-3 mb-4">
+              <AlertCircle size={16} className="shrink-0" />
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                Name
+              </label>
+              <div className="relative">
+                <User
+                  size={16}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+                />
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Your name"
+                  required
+                  minLength={2}
+                  className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg pl-10 pr-4 py-2.5 text-sm placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                Email
+              </label>
+              <div className="relative">
+                <Mail
+                  size={16}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+                />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                  className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg pl-10 pr-4 py-2.5 text-sm placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                Password
+              </label>
+              <div className="relative">
+                <Lock
+                  size={16}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+                />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  required
+                  minLength={8}
+                  className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg pl-10 pr-4 py-2.5 text-sm placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+            >
+              {loading ? 'Creating account...' : 'Create Account'}
+            </button>
+          </form>
+
+          <p className="text-slate-400 text-sm text-center mt-6">
+            Already have an account?{' '}
+            <Link
+              href="/auth/signin"
+              className="text-indigo-400 hover:text-indigo-300 font-medium"
+            >
+              Sign in
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

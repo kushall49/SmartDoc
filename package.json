@@ -9,16 +9,19 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "test": "jest --passWithNoTests",
-    "test:watch": "jest --watch --passWithNoTests",
-    "test:coverage": "jest --coverage --passWithNoTests",
-    "test:unit": "jest --testPathPattern=__tests__ --passWithNoTests",
+    "test": "cross-env NODE_OPTIONS=--max-old-space-size=4096 jest --passWithNoTests",
+    "test:watch": "cross-env NODE_OPTIONS=--max-old-space-size=4096 jest --watch --passWithNoTests",
+    "test:coverage": "cross-env NODE_OPTIONS=--max-old-space-size=4096 jest --coverage --passWithNoTests",
+    "test:unit": "cross-env NODE_OPTIONS=--max-old-space-size=4096 jest --testPathPattern=__tests__ --passWithNoTests",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "e2e:headed": "playwright test --headed",
-    "test:all": "npm run test:unit && npm run e2e"
+    "test:all": "npm run test:unit && npm run e2e",
+    "worker": "tsx src/worker.ts",
+    "worker:dev": "tsx watch src/worker.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
     "@aws-sdk/client-s3": "^3.540.0",
     "@aws-sdk/s3-request-presigner": "^3.540.0",
     "@radix-ui/react-alert-dialog": "^1.0.5",
@@ -61,8 +64,8 @@
   "devDependencies": {
     "@playwright/test": "^1.41.2",
     "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^14.2.1",
-    "@testing-library/user-event": "^14.5.2",
+    "@testing-library/react": "^14.3.1",
+    "@testing-library/user-event": "^14.6.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/dompurify": "^3.0.5",
     "@types/jest": "^30.0.0",
@@ -73,6 +76,7 @@
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
     "autoprefixer": "^10.4.17",
+    "cross-env": "^10.1.0",
     "eslint": "^8.56.0",
     "eslint-config-next": "^15.0.0",
     "jest": "^29.7.0",
@@ -80,7 +84,9 @@
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "ts-jest": "^29.1.2",
-    "typescript": "^5.3.3"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3",
+    "tsx": "^4.7.0"
   },
   "engines": {
     "node": ">=18.17.0",

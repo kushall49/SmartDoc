@@ -1,0 +1,35 @@
+SERVICE AGREEMENT
+
+This Service Agreement is made on 2026-04-21 between:
+
+Client: M&E Kumar Technologies
+Address: Pune, Maharashtra, India
+
+Provider: DataBridge Solutions Pvt Ltd
+Address: Bengaluru, Karnataka, India
+
+Scope of Services:
+1. Build and maintain a document intelligence dashboard.
+2. Integrate OCR processing for PDF and image uploads.
+3. Provide analytics and audit logs for all AI operations.
+
+Term:
+The agreement starts on 2026-05-01 and ends on 2027-04-30.
+
+Fees:
+Monthly Fee: INR 85,000
+Setup Fee: INR 40,000 (one-time)
+Late Payment Penalty: 2% per month
+
+Confidentiality:
+Both parties must keep proprietary information confidential for 3 years after termination.
+
+Termination:
+Either party may terminate with 30 days written notice.
+
+Liability:
+Provider liability is limited to the total fees paid in the previous 6 months.
+
+Signatures:
+Authorized Signatory - M&E Kumar Technologies
+Authorized Signatory - DataBridge Solutions Pvt Ltd

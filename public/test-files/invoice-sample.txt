@@ -1,0 +1,35 @@
+INVOICE
+Invoice Number: INV-2026-1042
+Date: 2026-04-20
+Due Date: 2026-05-05
+
+Bill To:
+M&E Kumar Consulting
+Mumbai, India
+Email: accounts@mekumar.example
+
+Vendor:
+Northwind Office Supplies
+GSTIN: 27ABCDE1234F1Z5
+
+Line Items:
+1) Premium Paper A4 (10 boxes) - INR 4,500
+2) Ink Cartridge Set (5 units) - INR 7,250
+3) Delivery Charge - INR 450
+
+Subtotal: INR 12,200
+Tax (18% GST): INR 2,196
+Total Amount: INR 14,396
+
+Payment Terms:
+- Net 15
+- Bank Transfer Only
+
+Bank Details:
+Account Name: Northwind Office Supplies
+Bank: Axis Bank
+Account Number: 920145678123
+IFSC: UTIB0000456
+
+Notes:
+Please include Invoice Number in payment reference.

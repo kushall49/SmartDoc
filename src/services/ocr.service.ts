@@ -1,169 +1,68 @@
-import Tesseract from 'tesseract.js';
+import pdfParse from 'pdf-parse';
+import mammoth from 'mammoth';
 import { logger } from '@/lib/logger';
-import { PROCESSING_CONFIG } from '@/lib/config';
 
-export interface OCRResult {
+export interface OcrResult {
   text: string;
+  pageCount: number;
+  language: string;
   confidence: number;
-  language?: string;
 }
 
-/**
- * Extract text from an image using Tesseract.js OCR
- */
-export async function extractTextFromImage(
-  imageBuffer: Buffer,
-  language = 'eng'
-): Promise<OCRResult> {
+export async function extractTextFromPdf(buffer: Buffer): Promise<OcrResult> {
+  const data = await pdfParse(buffer);
+  return {
+    text: (data.text ?? '').trim(),
+    pageCount: data.numpages ?? 1,
+    language: 'en',
+    confidence: 1.0,
+  };
+}
+
+export async function extractTextFromDocx(buffer: Buffer): Promise<OcrResult> {
+  const result = await mammoth.extractRawText({ buffer });
+  return {
+    text: (result.value ?? '').trim(),
+    pageCount: 1,
+    language: 'en',
+    confidence: 1.0,
+  };
+}
+
+export async function extractTextFromImage(buffer: Buffer): Promise<OcrResult> {
   try {
-    logger.info('Starting OCR extraction', { language, bufferSize: imageBuffer.length });
-
-    const { data } = await Tesseract.recognize(imageBuffer, language, {
-      logger: (m) => {
-        if (m.status === 'recognizing text') {
-          logger.debug('OCR progress', { progress: Math.round(m.progress * 100) });
-        }
-      },
-    });
-
-    const result: OCRResult = {
-      text: data.text.trim(),
-      confidence: data.confidence,
-      language: data.text.length > 0 ? language : undefined,
+    const Tesseract = await import('tesseract.js');
+    const { data } = await Tesseract.default.recognize(buffer, 'eng');
+    return {
+      text: (data.text ?? '').trim(),
+      pageCount: 1,
+      language: 'en',
+      confidence: (data.confidence ?? 70) / 100,
     };
-
-    logger.info('OCR extraction completed', {
-      textLength: result.text.length,
-      confidence: result.confidence,
-    });
-
-    return result;
-  } catch (error) {
-    logger.error('OCR extraction failed', error as Error);
-    throw new Error('Failed to extract text from image');
+  } catch (e) {
+    logger.warn('Tesseract OCR failed', { error: String(e) });
+    return { text: '', pageCount: 1, language: 'en', confidence: 0 };
   }
 }
 
-/**
- * Extract text from PDF using pdf-parse
- */
-export async function extractTextFromPDF(pdfBuffer: Buffer): Promise<string> {
-  try {
-    logger.info('Starting PDF text extraction', { bufferSize: pdfBuffer.length });
-
-    const pdf = await import('pdf-parse');
-    const data = await pdf.default(pdfBuffer);
-
-    const text = data.text.trim();
-
-    logger.info('PDF extraction completed', {
-      pages: data.numpages,
-      textLength: text.length,
-    });
-
-    return text;
-  } catch (error) {
-    logger.error('PDF extraction failed', error as Error);
-    throw new Error('Failed to extract text from PDF');
-  }
-}
-
-/**
- * Extract text from DOCX using mammoth
- */
-export async function extractTextFromDOCX(docxBuffer: Buffer): Promise<string> {
-  try {
-    logger.info('Starting DOCX text extraction', { bufferSize: docxBuffer.length });
-
-    const mammoth = await import('mammoth');
-    const result = await mammoth.extractRawText({ buffer: docxBuffer });
-
-    const text = result.value.trim();
-
-    logger.info('DOCX extraction completed', {
-      textLength: text.length,
-      warnings: result.messages.length,
-    });
-
-    if (result.messages.length > 0) {
-      logger.warn('DOCX extraction warnings', { messages: result.messages });
-    }
-
-    return text;
-  } catch (error) {
-    logger.error('DOCX extraction failed', error as Error);
-    throw new Error('Failed to extract text from DOCX');
-  }
-}
-
-/**
- * Extract text from a document based on file type
- */
-export async function extractTextFromDocument(
+export async function extractText(
   buffer: Buffer,
-  fileType: string
-): Promise<string> {
-  const normalizedType = fileType.toLowerCase();
+  mimeType: string
+): Promise<OcrResult> {
+  logger.info('Extracting text', { mimeType, bytes: buffer.length });
 
-  logger.info('Extracting text from document', { fileType: normalizedType });
-
-  try {
-    switch (normalizedType) {
-      case 'pdf':
-        return await extractTextFromPDF(buffer);
-
-      case 'docx':
-        return await extractTextFromDOCX(buffer);
-
-      case 'png':
-      case 'jpg':
-      case 'jpeg': {
-        const ocrResult = await extractTextFromImage(buffer);
-        return ocrResult.text;
-      }
-
-      case 'txt':
-        return buffer.toString('utf-8').trim();
-
-      default:
-        throw new Error(`Unsupported file type: ${fileType}`);
-    }
-  } catch (error) {
-    logger.error('Document text extraction failed', error as Error, { fileType });
-    throw error;
+  if (mimeType === 'application/pdf') {
+    return extractTextFromPdf(buffer);
   }
-}
-
-/**
- * AWS Textract integration (optional, if configured)
- * This is a placeholder for AWS Textract implementation
- */
-export async function extractTextWithAWSTextract(
-  s3Key: string
-): Promise<OCRResult> {
-  if (!PROCESSING_CONFIG.useAWSTextract) {
-    throw new Error('AWS Textract is not configured');
+  if (
+    mimeType ===
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ) {
+    return extractTextFromDocx(buffer);
+  }
+  if (mimeType.startsWith('image/')) {
+    return extractTextFromImage(buffer);
   }
 
-  try {
-    logger.info('Using AWS Textract for OCR', { s3Key });
-
-    // TODO: Implement AWS Textract integration
-    // const textract = new TextractClient({ region: AWS_CONFIG.region });
-    // const command = new DetectDocumentTextCommand({
-    //   Document: {
-    //     S3Object: {
-    //       Bucket: AWS_CONFIG.bucketName,
-    //       Name: s3Key,
-    //     },
-    //   },
-    // });
-    // const response = await textract.send(command);
-    // Process response...
-
-    throw new Error('AWS Textract integration not yet implemented');
-  } catch (error) {
-    logger.error('AWS Textract extraction failed', error as Error);
-    throw new Error('Failed to extract text using AWS Textract');
-  }
+  throw new Error(`Unsupported MIME type for text extraction: ${mimeType}`);
 }

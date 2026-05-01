@@ -1,58 +1,53 @@
-import { NextRequest, NextResponse } from 'next/server';
-import connectDB from '@/lib/db';
-import DocumentModel from '@/models/Document';
-import { handleApiError } from '@/lib/errors';
+import { NextRequest } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { connectDB } from '@/lib/db';
+import { DocumentModel } from '@/models/Document';
+import { ok, unauthorized, serverError } from '@/lib/api-response';
+import mongoose from 'mongoose';
 
-/**
- * GET /api/documents?userId=xxx
- * Get all documents for a user
- */
 export async function GET(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) return unauthorized();
+
+    const { searchParams } = new URL(request.url);
+    const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'));
+    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') ?? '20')));
+    const status = searchParams.get('status');
+    const type = searchParams.get('type');
+    const search = searchParams.get('search');
+
     await connectDB();
 
-    const searchParams = request.nextUrl.searchParams;
-    const userId = searchParams.get('userId');
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const skip = parseInt(searchParams.get('skip') || '0');
-    const status = searchParams.get('status');
-
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, error: 'User ID is required' },
-        { status: 400 }
-      );
-    }
-
-    const query: Record<string, unknown> = { userId };
-    if (status) {
-      query['status.stage'] = status;
+    const query: Record<string, unknown> = {
+      userId: new mongoose.Types.ObjectId(session.user.id),
+    };
+    if (status) query.status = status;
+    if (type) query.documentType = type;
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { originalName: { $regex: search, $options: 'i' } },
+        { summary: { $regex: search, $options: 'i' } },
+      ];
     }
 
     const [documents, total] = await Promise.all([
       DocumentModel.find(query)
+        .select('-rawText -extractedText')
         .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
         .limit(limit)
-        .skip(skip)
-        .select('-extractedText -embeddings'),
+        .lean(),
       DocumentModel.countDocuments(query),
     ]);
 
-    return NextResponse.json({
-      success: true,
-      documents,
-      pagination: {
-        total,
-        limit,
-        skip,
-        hasMore: skip + limit < total,
-      },
-    });
-  } catch (error) {
-    const { error: errorMessage, statusCode } = handleApiError(error);
-    return NextResponse.json(
-      { success: false, error: errorMessage },
-      { status: statusCode }
+    return ok(
+      { documents, total },
+      { page, limit, pages: Math.ceil(total / limit) }
     );
+  } catch (e) {
+    return serverError(e);
   }
 }
