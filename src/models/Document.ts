@@ -1,177 +1,113 @@
-import mongoose, { Schema, Model } from 'mongoose';
-import { Document, Entity, DocumentMetadata, ProcessingStatus, Embedding } from '@/types';
+import mongoose, { Schema, Document as MongoDocument, model, models } from 'mongoose';
 
-const EntitySchema = new Schema<Entity>(
-  {
-    type: {
-      type: String,
-      enum: ['person', 'organization', 'location', 'date', 'money', 'email', 'phone', 'id', 'other'],
-      required: true,
-    },
-    value: {
-      type: String,
-      required: true,
-    },
-    confidence: Number,
-    startIndex: Number,
-    endIndex: Number,
-  },
-  { _id: false }
-);
+export type DocumentStatus = 'pending' | 'uploading' | 'processing' | 'ready' | 'failed';
+export type DocumentType =
+  | 'invoice'
+  | 'contract'
+  | 'resume'
+  | 'report'
+  | 'image'
+  | 'legal'
+  | 'other';
 
-const DocumentMetadataSchema = new Schema<DocumentMetadata>(
-  {
-    pageCount: Number,
-    author: String,
-    creationDate: Date,
-    modificationDate: Date,
-    language: String,
-    format: String,
-  },
-  { _id: false }
-);
+export interface ExtractedEntity {
+  type: string;
+  value: string;
+  confidence: number;
+  page?: number;
+}
 
-const ProcessingStatusSchema = new Schema<ProcessingStatus>(
-  {
-    stage: {
-      type: String,
-      enum: ['uploaded', 'processing', 'completed', 'failed'],
-      default: 'uploaded',
-    },
-    progress: {
-      type: Number,
-      default: 0,
-      min: 0,
-      max: 100,
-    },
-    message: String,
-    startedAt: Date,
-    completedAt: Date,
-    error: String,
-  },
-  { _id: false }
-);
+export interface IDocument extends MongoDocument {
+  _id: mongoose.Types.ObjectId;
+  userId: mongoose.Types.ObjectId;
+  name: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  s3Key: string;
+  s3Url: string;
+  status: DocumentStatus;
+  errorMessage?: string;
+  documentType?: DocumentType;
+  pageCount?: number;
+  language?: string;
+  rawText?: string;
+  summary?: string;
+  entities: ExtractedEntity[];
+  keywords: string[];
+  processingJobId?: string;
+  processingStartedAt?: Date;
+  processingCompletedAt?: Date;
+  aiProvider?: string;
+  aiModel?: string;
+  tokensUsed?: number;
+  anomalies: string[];
+  // Legacy field support
+  fileType?: string;
+  fileSize?: number;
+  filename?: string;
+  extractedText?: string;
+  fraudScore?: number;
+  fraudIndicators?: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
 
-const EmbeddingSchema = new Schema<Embedding>(
+const DocumentSchema = new Schema<IDocument>(
   {
-    vector: {
-      type: [Number],
-      required: true,
-    },
-    model: {
-      type: String,
-      required: true,
-    },
-    chunkIndex: {
-      type: Number,
-      required: true,
-    },
-    text: {
-      type: String,
-      required: true,
-    },
-  },
-  { _id: false }
-);
-
-const DocumentSchema = new Schema<Document>(
-  {
-    userId: {
-      type: String,
-      required: true,
-      index: true,
-    },
-    filename: {
-      type: String,
-      required: true,
-    },
-    originalName: {
-      type: String,
-      required: true,
-    },
-    fileType: {
-      type: String,
-      required: true,
-    },
-    fileSize: {
-      type: Number,
-      required: true,
-    },
-    s3Key: {
-      type: String,
-      required: true,
-      unique: true,
-    },
-    s3Url: {
-      type: String,
-      required: true,
-    },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    name: { type: String, required: true, trim: true },
+    originalName: { type: String, required: true },
+    mimeType: { type: String, required: true },
+    sizeBytes: { type: Number, required: true, default: 0 },
+    s3Key: { type: String, required: true },
+    s3Url: { type: String, default: '' },
     status: {
-      type: ProcessingStatusSchema,
-      default: () => ({
-        stage: 'uploaded',
-        progress: 0,
-      }),
-    },
-    extractedText: {
       type: String,
-      default: null,
+      enum: ['pending', 'uploading', 'processing', 'ready', 'failed'],
+      default: 'pending',
     },
-    summary: {
-      type: String,
-      default: null,
-    },
+    errorMessage: { type: String },
     documentType: {
       type: String,
-      default: null,
+      enum: ['invoice', 'contract', 'resume', 'report', 'image', 'legal', 'other'],
     },
-    entities: {
-      type: [EntitySchema],
-      default: [],
-    },
-    metadata: {
-      type: DocumentMetadataSchema,
-      default: null,
-    },
-    embeddings: {
-      type: [EmbeddingSchema],
-      default: [],
-    },
-    anomalyScore: {
-      type: Number,
-      default: null,
-    },
-    anomalyDetails: {
-      type: String,
-      default: null,
-    },
-  },
-  {
-    timestamps: true,
-    toJSON: {
-      transform: (_, ret) => {
-        (ret as any).id = ret._id;
-        delete (ret as any).__v;
-        return ret;
+    pageCount: { type: Number },
+    language: { type: String },
+    rawText: { type: String, select: false },
+    summary: { type: String },
+    entities: [
+      {
+        type: { type: String },
+        value: { type: String },
+        confidence: { type: Number },
+        page: { type: Number },
       },
-    },
-  }
+    ],
+    keywords: [{ type: String }],
+    processingJobId: { type: String },
+    processingStartedAt: { type: Date },
+    processingCompletedAt: { type: Date },
+    aiProvider: { type: String },
+    aiModel: { type: String },
+    tokensUsed: { type: Number },
+    anomalies: [{ type: String }],
+    // Legacy compatibility fields
+    fileType: { type: String },
+    fileSize: { type: Number },
+    filename: { type: String },
+    extractedText: { type: String, select: false },
+    fraudScore: { type: Number },
+    fraudIndicators: [{ type: String }],
+  },
+  { timestamps: true }
 );
 
-// Indexes for efficient queries
 DocumentSchema.index({ userId: 1, createdAt: -1 });
-DocumentSchema.index({ 'status.stage': 1 });
-DocumentSchema.index({ documentType: 1 });
-DocumentSchema.index({ createdAt: -1 });
+DocumentSchema.index({ userId: 1, status: 1 });
+DocumentSchema.index({ userId: 1, documentType: 1 });
+DocumentSchema.index({ s3Key: 1 });
 
-// Text search index for filename and extracted text
-DocumentSchema.index({ 
-  originalName: 'text', 
-  extractedText: 'text',
-  summary: 'text' 
-});
-
-// Prevent model recompilation in development
-const DocumentModel: Model<Document> = mongoose.models.Document || mongoose.model<Document>('Document', DocumentSchema);
-
-export default DocumentModel;
+export const DocumentModel =
+  (models.Document as mongoose.Model<IDocument>) ??
+  model<IDocument>('Document', DocumentSchema);

@@ -71,7 +71,13 @@ export function chunkText(
     }
 
     chunks.push(chunk.trim());
-    startIndex += chunk.length - overlap;
+
+    // If we've already consumed the entire text, stop — prevents negative-advance
+    // infinite loops when the text is shorter than the overlap size.
+    if (endIndex >= text.length) break;
+
+    // Advance by chunk length minus overlap, but at minimum 1 char so we never stall.
+    startIndex += Math.max(1, chunk.length - overlap);
   }
 
   logger.debug('Text chunked', { totalChunks: chunks.length, chunkSize, overlap });

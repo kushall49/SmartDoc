@@ -1,260 +1,273 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-// import { Separator } from '@/components/ui/separator';
-import { Loading } from '@/components/Loading';
-import { useToast } from '@/hooks/use-toast';
-import { Document } from '@/types';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
-  ArrowLeft,
-  // FileText,
-  // Download,
-  MessageSquare,
-  Trash2,
-  // Calendar,
-  // FileType,
-  AlertTriangle,
+  ArrowLeft, FileText, MessageSquare, Loader2, AlertCircle,
+  Tag, Calendar, Building, DollarSign, MapPin, Hash,
+  RefreshCw, AlertTriangle, Cpu,
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
+
+interface Entity { type: string; value: string; confidence: number }
+interface DocDetail {
+  _id: string;
+  name: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  status: string;
+  documentType?: string;
+  pageCount?: number;
+  language?: string;
+  summary?: string;
+  entities?: Entity[];
+  keywords?: string[];
+  anomalies?: string[];
+  aiProvider?: string;
+  aiModel?: string;
+  tokensUsed?: number;
+  errorMessage?: string;
+  processingStartedAt?: string;
+  processingCompletedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const ENTITY_ICONS: Record<string, React.ElementType> = {
+  person: Hash, date: Calendar, amount: DollarSign,
+  organization: Building, location: MapPin, id: Hash,
+  email: Tag, phone: Tag,
+};
+
+const ENTITY_COLORS: Record<string, string> = {
+  person: 'bg-blue-500/20 text-blue-300 border-blue-500/20',
+  date: 'bg-green-500/20 text-green-300 border-green-500/20',
+  amount: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/20',
+  organization: 'bg-purple-500/20 text-purple-300 border-purple-500/20',
+  location: 'bg-orange-500/20 text-orange-300 border-orange-500/20',
+  id: 'bg-slate-500/20 text-slate-300 border-slate-500/20',
+  email: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/20',
+  phone: 'bg-pink-500/20 text-pink-300 border-pink-500/20',
+};
+
+function formatBytes(bytes: number) {
+  if (!bytes) return '—';
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
 
 export default function DocumentDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { toast } = useToast();
-  const [document, setDocument] = useState<Document | null>(null);
+  const [doc, setDoc] = useState<DocDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [reprocessing, setReprocessing] = useState(false);
 
-  useEffect(() => {
-    const loadDocument = async () => {
-      try {
-        const response = await fetch(`/api/documents/${params.id}`);
-        const data = await response.json();
-
-        if (data.success) {
-          setDocument(data.document);
-        } else {
-          toast({
-            title: 'Document not found',
-            description: data.error,
-            variant: 'destructive',
-          });
-          router.push('/dashboard/documents');
-        }
-      } catch (error) {
-        toast({
-          title: 'Failed to load document',
-          description: error instanceof Error ? error.message : 'An error occurred',
-          variant: 'destructive',
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (params.id) {
-      loadDocument();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.id]);
-
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this document?')) return;
-
+  async function fetchDoc() {
+    setLoading(true); setError('');
     try {
-      const response = await fetch(`/api/documents/${params.id}`, {
-        method: 'DELETE',
-      });
+      const res = await fetch(`/api/documents/${params.id}`);
+      const data = await res.json();
+      if (data.success) setDoc(data.data.document);
+      else setError(data.error ?? 'Failed to load document');
+    } catch { setError('Network error'); }
+    finally { setLoading(false); }
+  }
 
-      if (response.ok) {
-        toast({
-          title: 'Document deleted',
-          description: 'The document has been successfully deleted',
-        });
-        router.push('/dashboard/documents');
+  async function reprocess() {
+    setReprocessing(true);
+    try {
+      const res = await fetch('/api/documents/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentId: params.id }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTimeout(() => { void fetchDoc(); }, 3000);
       }
-    } catch (error) {
-      toast({
-        title: 'Failed to delete document',
-        description: error instanceof Error ? error.message : 'An error occurred',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  if (loading) {
-    return <Loading message="Loading document..." />;
+    } finally { setReprocessing(false); }
   }
 
-  if (!document) {
-    return null;
-  }
+  useEffect(() => { void fetchDoc(); }, [params.id]);
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-16">
+      <Loader2 size={32} className="animate-spin text-indigo-400" />
+    </div>
+  );
+
+  if (error || !doc) return (
+    <div className="flex items-center justify-center py-16">
+      <div className="text-center">
+        <AlertCircle size={40} className="mx-auto text-red-400 mb-3" />
+        <p className="text-red-400 mb-4">{error || 'Document not found'}</p>
+        <button onClick={() => router.back()} className="text-slate-400 hover:text-white text-sm">← Go back</button>
+      </div>
+    </div>
+  );
+
+  const groupedEntities = (doc.entities ?? []).reduce((acc, e) => {
+    const key = e.type ?? 'other';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(e);
+    return acc;
+  }, {} as Record<string, Entity[]>);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.back()}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">{document.originalName}</h1>
-            <p className="text-muted-foreground mt-1">
-              {format(new Date(document.createdAt), 'MMMM d, yyyy at h:mm a')}
-            </p>
-          </div>
-        </div>
+    <div className="max-w-4xl mx-auto">
+      {/* Back + actions */}
+      <div className="flex items-center justify-between mb-6">
+        <button onClick={() => router.back()} className="flex items-center gap-2 text-slate-400 hover:text-white text-sm transition-colors">
+          <ArrowLeft size={16} /> Back
+        </button>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.push(`/dashboard/chat/${document._id}`)}>
-            <MessageSquare className="h-4 w-4 mr-2" />
-            Chat
-          </Button>
-          <Button variant="outline" onClick={handleDelete}>
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete
-          </Button>
+          {doc.status === 'failed' && (
+            <button onClick={reprocess} disabled={reprocessing}
+              className="flex items-center gap-2 text-xs bg-yellow-500/10 border border-yellow-500/20 text-yellow-300 hover:bg-yellow-500/20 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+              {reprocessing ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+              Reprocess
+            </button>
+          )}
+          {doc.status === 'ready' && (
+            <Link href={`/dashboard/chat/${doc._id}`}
+              className="flex items-center gap-2 text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg transition-colors">
+              <MessageSquare size={12} /> Chat
+            </Link>
+          )}
         </div>
       </div>
 
-      {/* Metadata */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Document Information</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Status</p>
-              <Badge
-                variant={
-                  document.status.stage === 'completed'
-                    ? 'success'
-                    : document.status.stage === 'processing'
-                    ? 'warning'
-                    : document.status.stage === 'failed'
-                    ? 'destructive'
-                    : 'default'
-                }
-              >
-                {document.status.stage}
-              </Badge>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">File Size</p>
-              <p className="font-medium">
-                {(document.fileSize / 1024 / 1024).toFixed(2)} MB
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Type</p>
-              <p className="font-medium capitalize">{document.documentType || 'Unknown'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Format</p>
-              <p className="font-medium">{document.fileType || 'Unknown'}</p>
+      {/* Header */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-6">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 bg-indigo-600/20 rounded-xl flex items-center justify-center shrink-0">
+            <FileText size={24} className="text-indigo-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl font-bold text-white truncate">{doc.name}</h1>
+            <p className="text-slate-400 text-sm mt-0.5">{doc.originalName}</p>
+            <div className="flex flex-wrap gap-2 mt-3">
+              <span className={cn('text-xs px-2 py-0.5 rounded-full border font-medium', {
+                'bg-green-500/20 text-green-300 border-green-500/20': doc.status === 'ready',
+                'bg-red-500/20 text-red-300 border-red-500/20': doc.status === 'failed',
+                'bg-yellow-500/20 text-yellow-300 border-yellow-500/20': ['processing','pending'].includes(doc.status),
+              })}>{doc.status}</span>
+              {doc.documentType && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 capitalize">{doc.documentType}</span>
+              )}
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Summary */}
-      {document.summary && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Summary</CardTitle>
-            <CardDescription>AI-generated document summary</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm leading-relaxed">{document.summary}</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Entities */}
-      {document.entities && document.entities.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Key Entities</CardTitle>
-            <CardDescription>Extracted entities from the document</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {document.entities.map((entity, index) => (
-                <Badge key={index} variant="outline" className="text-sm">
-                  <span className="font-semibold">{entity.type}:</span>
-                  <span className="ml-1">{entity.value}</span>
-                  {entity.confidence && (
-                    <span className="ml-1 text-xs opacity-70">
-                      ({Math.round(entity.confidence * 100)}%)
-                    </span>
-                  )}
-                </Badge>
-              ))}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5 pt-5 border-t border-slate-800 text-xs">
+          {[
+            ['File Size', formatBytes(doc.sizeBytes)],
+            ['Pages', doc.pageCount ? String(doc.pageCount) : '—'],
+            ['Language', doc.language ?? '—'],
+            ['Uploaded', new Date(doc.createdAt).toLocaleDateString()],
+          ].map(([label, value]) => (
+            <div key={label}>
+              <p className="text-slate-500">{label}</p>
+              <p className="text-slate-200 font-medium mt-0.5">{value}</p>
             </div>
-          </CardContent>
-        </Card>
+          ))}
+        </div>
+      </div>
+
+      {doc.status === 'failed' && doc.errorMessage && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <AlertCircle size={18} className="text-red-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-red-300 font-medium text-sm">Processing Failed</p>
+            <p className="text-red-400 text-xs mt-1">{doc.errorMessage}</p>
+          </div>
+        </div>
       )}
 
-      {/* Anomaly Detection */}
-      {document.anomalyScore !== null && document.anomalyScore !== undefined && (
-        <Card
-          className={
-            document.anomalyScore > 50
-              ? 'border-red-200 dark:border-red-900'
-              : document.anomalyScore > 30
-              ? 'border-yellow-200 dark:border-yellow-900'
-              : ''
-          }
-        >
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle
-                className={`h-5 w-5 ${
-                  document.anomalyScore > 50
-                    ? 'text-red-600'
-                    : document.anomalyScore > 30
-                    ? 'text-yellow-600'
-                    : 'text-green-600'
-                }`}
-              />
-              Anomaly Detection
-            </CardTitle>
-            <CardDescription>
-              Anomaly Score: {document.anomalyScore}/100
-              {document.anomalyScore > 50 && ' - High Risk'}
-              {document.anomalyScore > 30 && document.anomalyScore <= 50 && ' - Medium Risk'}
-              {document.anomalyScore <= 30 && ' - Low Risk'}
-            </CardDescription>
-          </CardHeader>
-          {document.anomalyDetails && (
-            <CardContent>
-              <p className="text-sm text-muted-foreground">{document.anomalyDetails}</p>
-            </CardContent>
-          )}
-        </Card>
+      {doc.summary && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-6">
+          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Summary</h2>
+          <p className="text-slate-200 text-sm leading-relaxed">{doc.summary}</p>
+        </div>
       )}
 
-      {/* Extracted Text */}
-      {document.extractedText && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Extracted Text</CardTitle>
-            <CardDescription>
-              Full text extracted from the document ({document.extractedText.length} characters)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="max-h-96 overflow-y-auto rounded-lg bg-muted p-4">
-              <pre className="text-sm whitespace-pre-wrap font-mono">
-                {document.extractedText}
-              </pre>
-            </div>
-          </CardContent>
-        </Card>
+      {Object.keys(groupedEntities).length > 0 && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-6">
+          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Extracted Entities</h2>
+          <div className="space-y-4">
+            {Object.entries(groupedEntities).map(([type, entities]) => {
+              const Icon = ENTITY_ICONS[type] ?? Tag;
+              const colorClass = ENTITY_COLORS[type] ?? 'bg-slate-500/20 text-slate-300 border-slate-500/20';
+              return (
+                <div key={type}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Icon size={13} className="text-slate-500" />
+                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">{type}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {entities.map((e, i) => (
+                      <span key={i} className={cn('text-xs px-2.5 py-1 rounded-full border font-medium', colorClass)}>
+                        {e.value}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {(doc.keywords ?? []).length > 0 && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-6">
+          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Keywords</h2>
+          <div className="flex flex-wrap gap-2">
+            {doc.keywords!.map((kw, i) => (
+              <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">{kw}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(doc.anomalies ?? []).length > 0 && (
+        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-6 mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle size={16} className="text-yellow-400" />
+            <h2 className="text-sm font-semibold text-yellow-400 uppercase tracking-wider">Anomalies Detected</h2>
+          </div>
+          <ul className="space-y-1">
+            {doc.anomalies!.map((a, i) => (
+              <li key={i} className="text-yellow-300 text-sm flex items-start gap-2">
+                <span className="shrink-0 mt-0.5">•</span>{a}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {doc.aiProvider && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Cpu size={15} className="text-slate-500" />
+            <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Processing Info</h2>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
+            {[
+              ['AI Provider', doc.aiProvider],
+              ['Model', doc.aiModel ?? '—'],
+              ['Tokens Used', doc.tokensUsed?.toLocaleString() ?? '—'],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <p className="text-slate-500">{label}</p>
+                <p className="text-slate-200 font-medium mt-0.5 font-mono">{value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

@@ -31,7 +31,7 @@ export async function generateSummary(text: string, maxLength = 500): Promise<st
 
     return summary;
   } catch (error) {
-    logger.error('Summary generation failed', error as Error);
+    logger.error('Summary generation failed', { error: String(error) });
     throw new Error('Failed to generate summary');
   }
 }
@@ -71,7 +71,7 @@ export async function extractEntities(text: string): Promise<Entity[]> {
 
     return entities;
   } catch (error) {
-    logger.error('Entity extraction failed', error as Error);
+    logger.error('Entity extraction failed', { error: String(error) });
     
     // Fallback: return basic regex-based entities
     return extractBasicEntities(text);
@@ -146,7 +146,7 @@ export async function classifyDocument(text: string): Promise<string> {
 
     return classification;
   } catch (error) {
-    logger.error('Document classification failed', error as Error);
+    logger.error('Document classification failed', { error: String(error) });
     return 'other';
   }
 }
@@ -191,7 +191,7 @@ export async function detectAnomalies(text: string): Promise<{
       details: result.details || 'No anomalies detected',
     };
   } catch (error) {
-    logger.error('Anomaly detection failed', error as Error);
+    logger.error('Anomaly detection failed', { error: String(error) });
     return {
       score: 0,
       details: 'Anomaly detection unavailable',
@@ -217,7 +217,7 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
 
     return embeddings;
   } catch (error) {
-    logger.error('Embedding generation failed', error as Error);
+    logger.error('Embedding generation failed', { error: String(error) });
     throw new Error('Failed to generate embeddings');
   }
 }

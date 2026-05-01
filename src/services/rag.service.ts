@@ -105,6 +105,38 @@ ${documentContext}`,
 }
 
 /**
+ * Retrieve relevant document chunks WITH citation metadata
+ * Returns chunk text, position, and similarity score for citation UI
+ */
+export async function retrieveRelevantChunksWithCitations(
+  query: string,
+  documentId: string,
+  topK = 5
+): Promise<Array<{ chunkIndex: number; text: string; score: number }>> {
+  try {
+    const { generateEmbeddings, cosineSimilarity } = await import('./ai.service');
+    const DocumentModel = (await import('@/models/Document')).default;
+
+    const [queryEmbedding] = await generateEmbeddings([query]);
+    const doc = await DocumentModel.findById(documentId).select('embeddings');
+    if (!doc?.embeddings?.length) return [];
+
+    const scored = doc.embeddings.map((emb: { chunkIndex: number; text: string; vector: number[] }) => ({
+      chunkIndex: emb.chunkIndex,
+      text: emb.text,
+      score: cosineSimilarity(queryEmbedding, emb.vector),
+    }));
+
+    return scored
+      .sort((a: { score: number }, b: { score: number }) => b.score - a.score)
+      .slice(0, topK);
+  } catch (error) {
+    logger.error('Citation retrieval failed', error as Error);
+    return [];
+  }
+}
+
+/**
  * Get conversation history for a document
  */
 export async function getConversationHistory(

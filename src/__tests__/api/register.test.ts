@@ -1,3 +1,6 @@
+/**
+ * @jest-environment node
+ */
 import { NextRequest } from 'next/server';
 import { POST as registerHandler } from '@/app/api/auth/register/route';
 import UserModel from '@/models/User';

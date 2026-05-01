@@ -1,214 +1,140 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Loading } from '@/components/Loading';
-import { FileText, Upload, CheckCircle, Clock, AlertCircle, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
+import { FileText, Upload, MessageSquare, Search, TrendingUp, Clock, Zap } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 
-interface Stats {
-  total: number;
-  completed: number;
-  processing: number;
-  failed: number;
+interface DashboardStats {
+  totalDocs: number;
+  readyDocs: number;
+  processingDocs: number;
+  failedDocs: number;
+  totalCalls: number;
+  totalCost: number;
 }
 
 export default function DashboardPage() {
   const { data: session } = useSession();
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [recentDocs, setRecentDocs] = useState<Array<{
+    _id: string;
+    name: string;
+    status: string;
+    documentType?: string;
+    createdAt: string;
+  }>>([]);
 
   useEffect(() => {
-    const loadStats = async () => {
-      if (!session?.user?.id) return;
-      
-      try {
-        const response = await fetch(`/api/documents?userId=${session.user.id}&limit=1000`);
-        const data = await response.json();
+    fetch('/api/documents?limit=5')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success) setRecentDocs(d.data.documents.slice(0, 5));
+      })
+      .catch(() => void 0);
 
-        if (data.success) {
-          const documents = data.documents;
-          const stats: Stats = {
-            total: documents.length,
-            completed: documents.filter((d: any) => d.status.stage === 'completed').length,
-            processing: documents.filter((d: any) => d.status.stage === 'processing').length,
-            failed: documents.filter((d: any) => d.status.stage === 'failed').length,
-          };
-          setStats(stats);
+    fetch('/api/analytics')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success) {
+          const ds = (d.data.documentStats ?? {}) as Record<string, number>;
+          setStats({
+            totalDocs: Object.values(ds).reduce((a, b) => a + b, 0),
+            readyDocs: ds['ready'] ?? 0,
+            processingDocs: (ds['processing'] ?? 0) + (ds['pending'] ?? 0),
+            failedDocs: ds['failed'] ?? 0,
+            totalCalls: d.data.totalCalls ?? 0,
+            totalCost: d.data.totalCost ?? 0,
+          });
         }
-      } catch (error) {
-        console.error('Failed to load stats:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+      })
+      .catch(() => void 0);
+  }, []);
 
-    loadStats();
-    const interval = setInterval(loadStats, 5000); // Refresh every 5 seconds
-    return () => clearInterval(interval);
-  }, [session]);
-
-  if (loading) {
-    return <Loading message="Loading dashboard..." />;
-  }
-
-  const statCards = [
-    {
-      title: 'Total Documents',
-      value: stats?.total || 0,
-      icon: FileText,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50 dark:bg-blue-900/20',
-    },
-    {
-      title: 'Completed',
-      value: stats?.completed || 0,
-      icon: CheckCircle,
-      color: 'text-green-600',
-      bgColor: 'bg-green-50 dark:bg-green-900/20',
-    },
-    {
-      title: 'Processing',
-      value: stats?.processing || 0,
-      icon: Clock,
-      color: 'text-yellow-600',
-      bgColor: 'bg-yellow-50 dark:bg-yellow-900/20',
-    },
-    {
-      title: 'Failed',
-      value: stats?.failed || 0,
-      icon: AlertCircle,
-      color: 'text-red-600',
-      bgColor: 'bg-red-50 dark:bg-red-900/20',
-    },
+  const quickActions = [
+    { label: 'Upload Document', href: '/dashboard/upload', icon: Upload, cls: 'bg-indigo-600 hover:bg-indigo-500' },
+    { label: 'Chat with Doc', href: '/dashboard/chat', icon: MessageSquare, cls: 'bg-violet-600 hover:bg-violet-500' },
+    { label: 'Search Docs', href: '/dashboard/search', icon: Search, cls: 'bg-blue-600 hover:bg-blue-500' },
   ];
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground mt-2">
-          Welcome back! Here&apos;s an overview of your documents.
-        </p>
+    <div>
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-white">
+          Welcome back{session?.user?.name ? `, ${session.user.name.split(' ')[0]}` : ''}
+        </h1>
+        <p className="text-slate-400 mt-1 text-sm">Your AI document intelligence dashboard</p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {statCards.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <Card key={stat.title}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-                <div className={`p-2 rounded-lg ${stat.bgColor}`}>
-                  <Icon className={`h-4 w-4 ${stat.color}`} />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-              </CardContent>
-            </Card>
-          );
-        })}
+      {stats && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {[
+            { label: 'Total Documents', value: String(stats.totalDocs), icon: FileText, sub: `${stats.readyDocs} ready` },
+            { label: 'Processing', value: String(stats.processingDocs), icon: Clock, sub: stats.failedDocs > 0 ? `${stats.failedDocs} failed` : 'All good' },
+            { label: 'AI Calls', value: String(stats.totalCalls), icon: Zap, sub: 'Last 30 days' },
+            { label: 'AI Cost', value: `$${stats.totalCost.toFixed(4)}`, icon: TrendingUp, sub: 'Last 30 days' },
+          ].map((s) => (
+            <div key={s.label} className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-slate-400 text-xs">{s.label}</span>
+                <s.icon size={16} className="text-slate-600" />
+              </div>
+              <p className="text-2xl font-bold text-white">{s.value}</p>
+              <p className="text-xs text-slate-500 mt-0.5">{s.sub}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mb-8">
+        <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Quick Actions</h2>
+        <div className="flex flex-wrap gap-3">
+          {quickActions.map((a) => (
+            <Link key={a.href} href={a.href}
+              className={`flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors ${a.cls}`}>
+              <a.icon size={16} />
+              {a.label}
+            </Link>
+          ))}
+        </div>
       </div>
 
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Get started with your documents</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
-          <Button asChild className="h-auto flex-col items-start p-4 space-y-2">
-            <Link href="/dashboard/upload">
-              <Upload className="h-8 w-8 mb-2" />
-              <div className="text-left">
-                <div className="font-semibold">Upload Documents</div>
-                <div className="text-xs font-normal opacity-90">
-                  Upload PDF, images, or DOCX files
+      {recentDocs.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Recent Documents</h2>
+            <Link href="/dashboard/documents" className="text-xs text-indigo-400 hover:text-indigo-300">View all</Link>
+          </div>
+          <div className="space-y-2">
+            {recentDocs.map((doc) => (
+              <Link key={doc._id} href={`/dashboard/documents/${doc._id}`}
+                className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 hover:border-slate-700 transition-colors">
+                <div className="flex items-center gap-3 min-w-0">
+                  <FileText size={15} className="text-indigo-400 shrink-0" />
+                  <span className="text-white text-sm font-medium truncate">{doc.name}</span>
                 </div>
-              </div>
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="h-auto flex-col items-start p-4 space-y-2">
-            <Link href="/dashboard/documents">
-              <FileText className="h-8 w-8 mb-2" />
-              <div className="text-left">
-                <div className="font-semibold">View Documents</div>
-                <div className="text-xs font-normal opacity-90">
-                  Browse and manage your documents
-                </div>
-              </div>
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="h-auto flex-col items-start p-4 space-y-2">
-            <Link href="/dashboard/search">
-              <TrendingUp className="h-8 w-8 mb-2" />
-              <div className="text-left">
-                <div className="font-semibold">Semantic Search</div>
-                <div className="text-xs font-normal opacity-90">
-                  Search documents using AI
-                </div>
-              </div>
-            </Link>
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Getting Started */}
-      {stats && stats.total === 0 && (
-        <Card className="border-dashed">
-          <CardHeader>
-            <CardTitle>Get Started</CardTitle>
-            <CardDescription>
-              Upload your first document to experience the power of AI document intelligence
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <h4 className="font-medium flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm">
-                  1
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${
+                  doc.status === 'ready' ? 'bg-green-500/20 text-green-300' :
+                  doc.status === 'failed' ? 'bg-red-500/20 text-red-300' :
+                  'bg-yellow-500/20 text-yellow-300'}`}>
+                  {doc.status}
                 </span>
-                Upload a Document
-              </h4>
-              <p className="text-sm text-muted-foreground ml-8">
-                Upload a PDF, image (PNG/JPG), or DOCX file up to 10MB
-              </p>
-            </div>
-            <div className="space-y-2">
-              <h4 className="font-medium flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm">
-                  2
-                </span>
-                AI Processing
-              </h4>
-              <p className="text-sm text-muted-foreground ml-8">
-                Our AI extracts text, generates summaries, identifies entities, and classifies your document
-              </p>
-            </div>
-            <div className="space-y-2">
-              <h4 className="font-medium flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm">
-                  3
-                </span>
-                Explore Insights
-              </h4>
-              <p className="text-sm text-muted-foreground ml-8">
-                Search semantically, chat with your documents, and extract valuable insights
-              </p>
-            </div>
-            <Button asChild className="w-full">
-              <Link href="/dashboard/upload">
-                <Upload className="h-4 w-4 mr-2" />
-                Upload Your First Document
               </Link>
-            </Button>
-          </CardContent>
-        </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {recentDocs.length === 0 && !stats && (
+        <div className="text-center py-16 bg-slate-900 border border-slate-800 rounded-2xl">
+          <FileText size={48} className="mx-auto text-slate-700 mb-4" />
+          <h3 className="text-slate-300 font-medium mb-2">No documents yet</h3>
+          <p className="text-slate-500 text-sm mb-4">Upload your first document to get started</p>
+          <Link href="/dashboard/upload"
+            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm px-4 py-2 rounded-lg">
+            <Upload size={16} /> Upload Document
+          </Link>
+        </div>
       )}
     </div>
   );

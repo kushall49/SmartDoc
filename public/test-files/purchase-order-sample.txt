@@ -1,0 +1,32 @@
+PURCHASE ORDER
+
+PO Number: PO-2026-7781
+Date: 2026-04-21
+Requested Delivery Date: 2026-04-30
+
+Buyer:
+M&E Kumar Operations
+Pune, Maharashtra, India
+procurement@mekumar.example
+
+Supplier:
+BluePeak Industrial Supplies
+GSTIN: 29AAACB1234L1ZX
+
+Items Ordered:
+1) Industrial Safety Gloves (200 units) @ INR 120 = INR 24,000
+2) Safety Helmets (80 units) @ INR 450 = INR 36,000
+3) Reflective Jackets (120 units) @ INR 300 = INR 36,000
+
+Subtotal: INR 96,000
+Shipping: INR 2,000
+GST (18%): INR 17,640
+Grand Total: INR 115,640
+
+Payment Terms:
+- 50% advance
+- Remaining 50% within 10 days of delivery
+
+Special Notes:
+- Delivery to Warehouse Gate 3
+- Include quality certificate with shipment

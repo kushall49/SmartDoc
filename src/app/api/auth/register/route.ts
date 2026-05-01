@@ -1,64 +1,54 @@
-import { NextResponse } from 'next/server';
-import connectDB from '@/lib/db';
-import UserModel from '@/models/User';
-import bcrypt from 'bcryptjs';
+import { NextRequest } from 'next/server';
+import { connectDB } from '@/lib/db';
+import { User } from '@/models/User';
+import { ok, err, serverError } from '@/lib/api-response';
 import { z } from 'zod';
+import bcrypt from 'bcryptjs';
 
 const registerSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  name: z.string().min(2, 'Name must be at least 2 characters').max(100),
+  email: z.string().email('Invalid email address').toLowerCase(),
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .max(128),
 });
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const parsed = registerSchema.safeParse(body);
+    if (!parsed.success) {
+      return err(parsed.error.issues[0]?.message ?? 'Validation failed');
+    }
 
-    // Validate input
-    const validatedData = registerSchema.parse(body);
+    const { name, email, password } = parsed.data;
 
     await connectDB();
 
-    // Check if user already exists
-    const existingUser = await UserModel.findOne({ email: validatedData.email });
-
-    if (existingUser) {
-      return NextResponse.json(
-        { success: false, error: 'User with this email already exists' },
-        { status: 400 }
-      );
+    const existing = await User.findOne({ email }).select('_id').lean();
+    if (existing) {
+      return err('An account with this email already exists', 409);
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(validatedData.password, 12);
+    const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create user
-    const user = await UserModel.create({
-      name: validatedData.name,
-      email: validatedData.email,
+    const user = await User.create({
+      name,
+      email,
       password: hashedPassword,
+      role: 'user',
     });
 
-    return NextResponse.json({
-      success: true,
-      user: {
+    return ok(
+      {
         id: user._id.toString(),
         name: user.name,
         email: user.email,
       },
-    });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { success: false, error: error.errors[0].message },
-        { status: 400 }
-      );
-    }
-
-    console.error('Registration error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to register user' },
-      { status: 500 }
+      undefined
     );
+  } catch (e) {
+    return serverError(e);
   }
 }

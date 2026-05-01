@@ -34,7 +34,8 @@ export function FileUpload({ onUploadComplete, userId, maxFiles = 5 }: FileUploa
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
     },
     maxSize: 10 * 1024 * 1024, // 10MB
-    maxFiles,
+    // maxFiles is intentionally NOT passed here: react-dropzone rejects ALL files when the
+    // total exceeds maxFiles. Instead we let onDrop slice the accepted list to maxFiles.
   });
 
   const removeFile = (index: number) => {

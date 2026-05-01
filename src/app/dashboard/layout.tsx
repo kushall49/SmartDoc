@@ -1,117 +1,193 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
-import { Button } from '@/components/ui/button';
-// import { Separator } from '@/components/ui/separator';
+import { useState } from 'react';
 import {
   LayoutDashboard,
   FileText,
   Search,
   Upload,
+  MessageSquare,
+  GitCompare,
+  Brain,
+  BarChart3,
+  ClipboardList,
+  LogOut,
   Menu,
   X,
-  LogOut,
-  User,
+  Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const navItems = [
-  { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
-  { href: '/dashboard/documents', label: 'Documents', icon: FileText },
-  { href: '/dashboard/search', label: 'Search', icon: Search },
-  { href: '/dashboard/upload', label: 'Upload', icon: Upload },
+const NAV_ITEMS = [
+  { label: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Documents', href: '/dashboard/documents', icon: FileText },
+  { label: 'Upload', href: '/dashboard/upload', icon: Upload },
+  { label: 'Search', href: '/dashboard/search', icon: Search },
+  { label: 'AI Chat', href: '/dashboard/chat', icon: MessageSquare },
 ];
+
+const AI_ITEMS = [
+  { label: 'Compare Docs', href: '/dashboard/compare', icon: GitCompare },
+  { label: 'Intelligence', href: '/dashboard/intelligence', icon: Brain },
+  { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
+  { label: 'Audit Trail', href: '/dashboard/audit', icon: ClipboardList },
+];
+
+function NavLink({
+  href,
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  href: string;
+  icon: React.ElementType;
+  label: string;
+  onClick?: () => void;
+}) {
+  const pathname = usePathname();
+  const isActive =
+    href === '/dashboard'
+      ? pathname === '/dashboard'
+      : pathname.startsWith(href);
+
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      prefetch={false}
+      className={cn(
+        'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+        isActive
+          ? 'bg-indigo-600 text-white'
+          : 'text-slate-400 hover:text-white hover:bg-slate-700'
+      )}
+    >
+      <Icon size={18} />
+      {label}
+    </Link>
+  );
+}
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
-  const router = useRouter();
   const { data: session } = useSession();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  const handleSignOut = async () => {
-    await signOut({ redirect: false });
-    router.push('/auth/signin');
-  };
+  const sidebar = (
+    <div className="flex flex-col h-full py-6 px-4">
+      {/* Logo */}
+      <div className="flex items-center gap-2 px-3 mb-8">
+        <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+          <Zap size={18} className="text-white" />
+        </div>
+        <span className="text-white font-bold text-lg">SmartDocIQ</span>
+      </div>
+
+      {/* Core nav */}
+      <div className="space-y-1 mb-6">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 mb-2">
+          Core
+        </p>
+        {NAV_ITEMS.map((item) => (
+          <NavLink
+            key={item.href}
+            {...item}
+            onClick={() => setMobileOpen(false)}
+          />
+        ))}
+      </div>
+
+      {/* AI features nav */}
+      <div className="space-y-1 mb-6">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 mb-2">
+          AI Features
+        </p>
+        {AI_ITEMS.map((item) => (
+          <NavLink
+            key={item.href}
+            {...item}
+            onClick={() => setMobileOpen(false)}
+          />
+        ))}
+      </div>
+
+      {/* User + sign out */}
+      <div className="mt-auto border-t border-slate-700 pt-4">
+        <div className="flex items-center gap-3 px-3 mb-3">
+          <div className="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
+            {session?.user?.name?.[0]?.toUpperCase() ?? 'U'}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-white truncate">
+              {session?.user?.name ?? 'User'}
+            </p>
+            <p className="text-xs text-slate-400 truncate">
+              {session?.user?.email ?? ''}
+            </p>
+          </div>
+        </div>
+        <button
+          suppressHydrationWarning
+          onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+          className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+        >
+          <LogOut size={18} />
+          Sign Out
+        </button>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden mr-2"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-          >
-            {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </Button>
-          <Link href="/dashboard" className="flex items-center space-x-2">
-            <span className="text-2xl">🧠</span>
-            <span className="font-bold text-xl">SmartDocIQ</span>
-          </Link>
-          <div className="flex-1" />
-          <nav className="flex items-center space-x-2">
-            {session?.user?.name && (
-              <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-lg bg-muted">
-                <User className="h-4 w-4" />
-                <span className="text-sm">{session.user.name}</span>
-              </div>
-            )}
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/">Home</Link>
-            </Button>
-            <Button variant="ghost" size="sm" onClick={handleSignOut}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
-            </Button>
-          </nav>
-        </div>
-      </header>
+    <div className="flex h-screen bg-slate-950">
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:flex flex-col w-64 bg-slate-900 border-r border-slate-800 shrink-0">
+        {sidebar}
+      </aside>
 
-      <div className="container flex-1 items-start md:grid md:grid-cols-[220px_minmax(0,1fr)] md:gap-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-10">
-        {/* Sidebar */}
-        <aside
-          className={cn(
-            'fixed top-16 z-30 h-[calc(100vh-4rem)] w-full shrink-0 md:sticky md:block border-r bg-background',
-            sidebarOpen ? 'block' : 'hidden md:block'
-          )}
+      {/* Mobile sidebar overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 lg:hidden"
+          onClick={() => setMobileOpen(false)}
         >
-          <div className="py-6 pr-6 lg:py-8">
-            <nav className="space-y-2">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = pathname === item.href;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setSidebarOpen(false)}
-                    className={cn(
-                      'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
-                      isActive
-                        ? 'bg-primary text-primary-foreground'
-                        : 'hover:bg-accent hover:text-accent-foreground'
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
-        </aside>
+          <div className="absolute inset-0 bg-black/60" />
+          <aside
+            className="absolute left-0 top-0 h-full w-64 bg-slate-900 z-50"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {sidebar}
+          </aside>
+        </div>
+      )}
 
-        {/* Main Content */}
-        <main className="flex w-full flex-col overflow-hidden py-6 lg:py-8">
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Mobile header */}
+        <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-800">
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="text-slate-400 hover:text-white"
+          >
+            <Menu size={22} />
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 bg-indigo-600 rounded flex items-center justify-center">
+              <Zap size={14} className="text-white" />
+            </div>
+            <span className="text-white font-bold">SmartDocIQ</span>
+          </div>
+          <div className="w-6" />
+        </header>
+
+        {/* Page content */}
+        <main className="flex-1 overflow-auto bg-slate-950 p-4 lg:p-8">
           {children}
         </main>
       </div>
