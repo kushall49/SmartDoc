@@ -199,14 +199,14 @@ export async function POST(request: NextRequest) {
           .lean();
 
         const ranked = queryEmbedding
-          ? embeddings
+          ? (embeddings
               .reduce((acc, e) => {
                 const sim = cosineSimilarity(queryEmbedding as number[], e.embedding);
                 if (sim > 0.25) acc.push({ ...e, similarity: sim });
                 return acc;
-              }, [] as typeof embeddings & { similarity: number }[])
+              }, [] as Array<typeof embeddings[0] & { similarity: number }>)
               .sort((a, b) => b.similarity - a.similarity)
-              .slice(0, 30)
+              .slice(0, 30))
           : [];
 
         // Fallback retrieval: when semantic index is unavailable, use raw extracted text
