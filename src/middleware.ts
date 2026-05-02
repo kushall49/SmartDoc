@@ -20,22 +20,21 @@ export default withAuth(
       );
     }
 
-    // Redirect authenticated users away from auth pages
-    if (
-      token &&
-      (pathname.startsWith('/auth/signin') ||
-        pathname.startsWith('/auth/signup'))
-    ) {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
-    }
-
     return NextResponse.next();
   },
   {
     callbacks: {
       authorized: ({ token, req }) => {
+        // Allow home page for everyone
+        if (req.nextUrl.pathname === '/') {
+          return true;
+        }
         // Protect /dashboard/* routes
         if (req.nextUrl.pathname.startsWith('/dashboard')) {
+          return !!token;
+        }
+        // Protect /profile route
+        if (req.nextUrl.pathname.startsWith('/profile')) {
           return !!token;
         }
         // Let middleware return JSON 401 for unauthenticated protected API requests.
@@ -54,7 +53,9 @@ export default withAuth(
 
 export const config = {
   matcher: [
+    '/',
     '/dashboard/:path*',
+    '/profile/:path*',
     '/api/documents/:path*',
     '/api/chat/:path*',
     '/api/search/:path*',

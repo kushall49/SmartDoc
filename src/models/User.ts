@@ -47,7 +47,6 @@ const UserSchema = new Schema<IUser>(
   }
 );
 
-UserSchema.index({ email: 1 }, { unique: true });
 UserSchema.index({ tokensResetAt: 1 });
 
 UserSchema.pre('save', async function (next) {
