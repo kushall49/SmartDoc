@@ -221,7 +221,7 @@ function AboutSection() {
         <div className="mx-auto px-4" style={{ maxWidth: '70%' }}>
           <div className="space-y-8">
             <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-foreground leading-tight">
-              We're on a mission to revolutionize document intelligence.
+              We&apos;re on a mission to revolutionize document intelligence.
             </h2>
             
             <div className="space-y-6">
@@ -230,11 +230,11 @@ function AboutSection() {
               </p>
 
               <p className="text-base text-foreground/70 leading-relaxed">
-                Whether you're processing invoices, contracts, or research papers, SmartDoc makes it faster, smarter, and more cost-effective. Our advanced algorithms for accurate text extraction and intelligent processing, combined with bank-level encryption and compliance with GDPR, SOC 2, and ISO standards, ensure your data is always secure. With our APIs, webhooks, and pre-built connectors for popular business tools, integrating SmartDoc into your existing workflows is seamless.
+                Whether you&apos;re processing invoices, contracts, or research papers, SmartDoc makes it faster, smarter, and more cost-effective. Our advanced algorithms for accurate text extraction and intelligent processing, combined with bank-level encryption and compliance with GDPR, SOC 2, and ISO standards, ensure your data is always secure. With our APIs, webhooks, and pre-built connectors for popular business tools, integrating SmartDoc into your existing workflows is seamless.
               </p>
 
               <p className="text-base text-foreground/70 leading-relaxed">
-                We believe in a future where artificial intelligence empowers businesses to extract actionable insights from their documents effortlessly. Our vision is to become the world's most trusted document intelligence platform, and we're committed to continuously evolving with AI, maintaining enterprise-trusted infrastructure, and offering transparent pricing with no hidden surprises. Every feature we build is designed with innovation, reliability, and transparency at its core.
+                We believe in a future where artificial intelligence empowers businesses to extract actionable insights from their documents effortlessly. Our vision is to become the world&apos;s most trusted document intelligence platform, and we&apos;re committed to continuously evolving with AI, maintaining enterprise-trusted infrastructure, and offering transparent pricing with no hidden surprises. Every feature we build is designed with innovation, reliability, and transparency at its core.
               </p>
             </div>
           </div>
@@ -294,7 +294,7 @@ function ContactSection() {
                 </h2>
                 <p className="text-lg text-foreground/70 leading-relaxed">
                   Want to know more about SmartDoc?<br />
-                  Fill out the form and we'll get back to you.
+                  Fill out the form and we&apos;ll get back to you.
                 </p>
               </div>
 
