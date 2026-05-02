@@ -32,25 +32,28 @@ export async function POST(request: NextRequest) {
     let result;
 
     switch (mode) {
-      case 'entity-timeline':
+      case 'entity-timeline': {
         if (!entityValue) {
           return NextResponse.json({ success: false, error: 'entityValue required for entity-timeline mode' }, { status: 400 });
         }
         const timeline = await trackEntityAcrossDocuments(userId, entityValue);
         result = { entityTimelines: [timeline] };
         break;
+      }
 
-      case 'cluster':
+      case 'cluster': {
         const clusters = await clusterDocumentsByTopic(userId);
         result = { clusters };
         break;
+      }
 
       case 'full-analysis':
-      default:
+      default: {
         if (!query) {
           return NextResponse.json({ success: false, error: 'query is required for full-analysis mode' }, { status: 400 });
         }
         result = await analyzeAcrossDocuments(userId, query);
+      }
     }
 
     await logAuditEvent(userId, 'ai.cross-intelligence', {
