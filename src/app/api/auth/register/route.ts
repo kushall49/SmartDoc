@@ -3,7 +3,6 @@ import { connectDB } from '@/lib/db';
 import { User } from '@/models/User';
 import { ok, err, serverError } from '@/lib/api-response';
 import { z } from 'zod';
-import bcrypt from 'bcryptjs';
 
 const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
@@ -31,12 +30,10 @@ export async function POST(request: NextRequest) {
       return err('An account with this email already exists', 409);
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
-
     const user = await User.create({
       name,
       email,
-      password: hashedPassword,
+      password,
       role: 'user',
     });
 

@@ -4,7 +4,10 @@ import { signIn } from 'next-auth/react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, FormEvent } from 'react';
-import { Zap, Mail, Lock, AlertCircle } from 'lucide-react';
+import { Mail, Lock, AlertCircle, ArrowRight } from 'lucide-react';
+import Image from 'next/image';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 export default function SignInPage() {
   const router = useRouter();
@@ -39,85 +42,117 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="flex items-center justify-center gap-3 mb-8">
-          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
-            <Zap size={20} className="text-white" />
+    <div className="min-h-screen bg-background overflow-hidden flex items-center justify-center px-4">
+      {/* Background gradients */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_50%,rgba(139,92,246,0.15),transparent_50%),radial-gradient(circle_at_80%_80%,rgba(56,189,248,0.1),transparent_50%)]" />
+      
+      <div className="relative z-10 w-full max-w-md">
+        {/* Header */}
+        <div className="mb-8 flex flex-col items-center">
+          <div className="mb-6 flex items-center gap-3">
+            <Image src="/smartdoc-logo.svg" alt="SmartDoc logo" width={48} height={48} className="h-12 w-auto" />
+            <span className="text-xl font-bold text-foreground">SmartDoc</span>
           </div>
-          <span className="text-white font-bold text-2xl">SmartDocIQ</span>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8">
-          <h1 className="text-2xl font-bold text-white mb-1">Welcome back</h1>
-          <p className="text-slate-400 text-sm mb-6">Sign in to your account</p>
+        {/* Card */}
+        <div className={cn(
+          'relative overflow-hidden rounded-3xl p-8',
+          'border border-foreground/10 backdrop-blur-sm',
+          'bg-gradient-to-br from-foreground/5 via-foreground/[0.02] to-foreground/5'
+        )}>
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent" />
+          
+          <div className="relative z-10">
+            <h1 className="text-2xl font-bold text-foreground mb-2">Welcome back</h1>
+            <p className="text-foreground/70 text-sm mb-6">Sign in to your account</p>
 
-          {error && (
-            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg px-4 py-3 mb-4">
-              <AlertCircle size={16} className="shrink-0" />
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                Email
-              </label>
-              <div className="relative">
-                <Mail
-                  size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
-                />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  required
-                  className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg pl-10 pr-4 py-2.5 text-sm placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                />
+            {error && (
+              <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg px-4 py-3 mb-6">
+                <AlertCircle size={16} className="shrink-0" />
+                {error}
               </div>
-            </div>
+            )}
 
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                Password
-              </label>
-              <div className="relative">
-                <Lock
-                  size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
-                />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg pl-10 pr-4 py-2.5 text-sm placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                />
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Email
+                </label>
+                <div className="relative group">
+                  <Mail
+                    size={16}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground/40 transition-colors group-focus-within:text-primary"
+                  />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    required
+                    className={cn(
+                      'w-full bg-foreground/5 border border-foreground/10 text-foreground rounded-xl',
+                      'pl-11 pr-4 py-3 text-sm placeholder:text-foreground/40',
+                      'focus:outline-none focus:border-primary/30 focus:ring-1 focus:ring-primary/20',
+                      'transition-all duration-200'
+                    )}
+                  />
+                </div>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Password
+                </label>
+                <div className="relative group">
+                  <Lock
+                    size={16}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground/40 transition-colors group-focus-within:text-primary"
+                  />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    className={cn(
+                      'w-full bg-foreground/5 border border-foreground/10 text-foreground rounded-xl',
+                      'pl-11 pr-4 py-3 text-sm placeholder:text-foreground/40',
+                      'focus:outline-none focus:border-primary/30 focus:ring-1 focus:ring-primary/20',
+                      'transition-all duration-200'
+                    )}
+                  />
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                disabled={loading}
+                variant="hero"
+                size="lg"
+                className="w-full mt-6"
+              >
+                {loading ? 'Signing in...' : 'Sign In'}
+                <ArrowRight size={16} className="ml-2" />
+              </Button>
+            </form>
+
+            <div className="mt-6 flex items-center gap-2">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-foreground/10 to-transparent" />
+              <span className="text-xs text-foreground/50 px-2">or</span>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-foreground/10 to-transparent" />
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
-            >
-              {loading ? 'Signing in...' : 'Sign In'}
-            </button>
-          </form>
-
-          <p className="text-slate-400 text-sm text-center mt-6">
-            Don&apos;t have an account?{' '}
-            <Link
-              href="/auth/signup"
-              className="text-indigo-400 hover:text-indigo-300 font-medium"
-            >
-              Sign up
-            </Link>
-          </p>
+            <p className="text-foreground/70 text-sm text-center mt-6">
+              Don&apos;t have an account?{' '}
+              <Link
+                href="/auth/signup"
+                className="text-primary hover:text-primary/90 font-medium transition-colors"
+              >
+                Sign up
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>
