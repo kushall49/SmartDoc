@@ -198,15 +198,17 @@ export async function POST(request: NextRequest) {
           .select('embedding documentId chunkText pageNumber')
           .lean();
 
-        const ranked = queryEmbedding
-          ? (embeddings
-              .reduce((acc, e) => {
+        // Compute similarity scores and rank embeddings. Use `any` here to
+        // avoid strict mongoose/lean typing issues during build.
+        const ranked: Array<any> = queryEmbedding
+          ? (embeddings as any[])
+              .reduce((acc: any[], e: any) => {
                 const sim = cosineSimilarity(queryEmbedding as number[], e.embedding);
                 if (sim > 0.25) acc.push({ ...e, similarity: sim });
                 return acc;
-              }, [] as Array<typeof embeddings[0] & { similarity: number }>)
+              }, [])
               .sort((a, b) => b.similarity - a.similarity)
-              .slice(0, 30))
+              .slice(0, 30)
           : [];
 
         // Fallback retrieval: when semantic index is unavailable, use raw extracted text
