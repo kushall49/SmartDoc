@@ -9,7 +9,7 @@ export const DOCUMENT_QUEUE_NAME = 'document-processing';
  * BullMQ requires a long-lived worker (`npm run worker`). Vercel has none, so jobs
  * would sit forever. Opt in with USE_DOCUMENT_QUEUE=true when a worker shares Redis.
  */
-function shouldUseBullMqQueue(): boolean {
+export function shouldUseBullMqQueue(): boolean {
   if (process.env.USE_DOCUMENT_QUEUE === 'true') return true;
   if (process.env.VERCEL === '1') return false;
   return true;
@@ -73,19 +73,11 @@ export function startDocumentProcessingWorker(): Worker {
 }
 
 export async function addDocumentToQueue(documentId: string): Promise<string> {
+  // Vercel/serverless: do not run work here — `after()` is killed by platform timeouts
+  // without running catch blocks, leaving documents stuck in `processing`. The client
+  // calls POST /api/documents/process for a dedicated invocation with maxDuration.
   if (!shouldUseBullMqQueue()) {
-    const { after } = await import('next/server');
-    after(async () => {
-      try {
-        await processDocument(documentId);
-      } catch (err) {
-        logger.error('Serverless document processing failed', {
-          documentId,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    });
-    logger.info('Document processing scheduled after response (no BullMQ worker)', {
+    logger.info('Document marked for client-triggered processing (no BullMQ)', {
       documentId,
     });
     return `inline-${documentId}`;

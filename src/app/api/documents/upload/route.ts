@@ -4,14 +4,11 @@ import { authOptions } from '@/lib/auth';
 import { connectDB } from '@/lib/db';
 import { DocumentModel } from '@/models/Document';
 import { uploadFile, validateFile } from '@/services/s3.service';
-import { addDocumentToQueue } from '@/services/queue.service';
+import { addDocumentToQueue, shouldUseBullMqQueue } from '@/services/queue.service';
 import { ok, err, unauthorized, serverError } from '@/lib/api-response';
 import { checkApiRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import mongoose from 'mongoose';
-
-/** Allow AI/OCR pipeline to finish on Vercel (plan may cap lower). */
-export const maxDuration = 300;
 
 // Generate a unique file key scoped to the user
 function buildS3Key(userId: string, originalName: string): string {
@@ -81,6 +78,8 @@ export async function POST(request: NextRequest) {
       jobId,
       name: doc.name,
       status: 'pending',
+      /** When true, browser should POST /api/documents/process (serverless has no worker). */
+      clientShouldProcess: !shouldUseBullMqQueue(),
     });
   } catch (e) {
     logger.error('Upload error', { error: String(e) });
