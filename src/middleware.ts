@@ -23,6 +23,7 @@ export default withAuth(
     return NextResponse.next();
   },
   {
+    secret: process.env.NEXTAUTH_SECRET,
     callbacks: {
       authorized: ({ token, req }) => {
         // Allow home page for everyone
@@ -63,6 +64,5 @@ export const config = {
     '/api/audit/:path*',
     '/api/intelligence/:path*',
     '/api/files/:path*',
-    '/auth/:path*',
   ],
 };

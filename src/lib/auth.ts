@@ -1,6 +1,7 @@
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { connectDB } from './db';
+import { logger } from './logger';
 import { User } from '@/models/User';
 import bcrypt from 'bcryptjs';
 
@@ -33,7 +34,10 @@ export const authOptions: NextAuthOptions = {
             image: user.image,
             role: user.role,
           };
-        } catch {
+        } catch (e) {
+          logger.error('Credentials authorize failed', {
+            message: e instanceof Error ? e.message : String(e),
+          });
           return null;
         }
       },

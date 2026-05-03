@@ -39,10 +39,12 @@ export default function SignUpPage() {
         email,
         password,
         redirect: false,
+        callbackUrl: '/dashboard',
       });
-      if (result?.error) {
+      if (result?.error || result?.ok === false) {
         router.push('/auth/signin');
       } else {
+        router.refresh();
         router.push('/dashboard');
       }
     } catch {
