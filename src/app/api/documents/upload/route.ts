@@ -10,6 +10,9 @@ import { checkApiRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import mongoose from 'mongoose';
 
+/** Allow AI/OCR pipeline to finish on Vercel (plan may cap lower). */
+export const maxDuration = 300;
+
 // Generate a unique file key scoped to the user
 function buildS3Key(userId: string, originalName: string): string {
   const timestamp = Date.now();
