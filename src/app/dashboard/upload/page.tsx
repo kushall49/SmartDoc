@@ -61,9 +61,12 @@ function StatusBadge({ status }: { status: UploadStatus }) {
   );
 }
 
+const STALE_PROCESSING_MS = 4 * 60 * 1000;
+
 export default function UploadPage() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const pollingRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
+  const processRecoveryRef = useRef(new Set<string>());
 
   const pollStatus = useCallback((documentId: string, fileId: string) => {
     const interval = setInterval(async () => {
@@ -71,7 +74,25 @@ export default function UploadPage() {
         const res = await fetch(`/api/documents/${documentId}/status`);
         const data = await res.json();
         if (!data.success) return;
-        const { status } = data.data;
+        const { status, processingStartedAt } = data.data;
+
+        if (
+          status === 'processing' &&
+          processingStartedAt &&
+          !processRecoveryRef.current.has(documentId)
+        ) {
+          const age =
+            Date.now() - new Date(processingStartedAt).getTime();
+          if (age > STALE_PROCESSING_MS) {
+            processRecoveryRef.current.add(documentId);
+            void fetch('/api/documents/process', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ documentId }),
+            }).catch(() => {});
+          }
+        }
 
         setFiles((prev) =>
           prev.map((f) =>
@@ -133,7 +154,7 @@ export default function UploadPage() {
           return;
         }
 
-        const { documentId, jobId } = data.data;
+        const { documentId, jobId, clientShouldProcess } = data.data;
 
         setFiles((prev) =>
           prev.map((f) =>
@@ -142,6 +163,15 @@ export default function UploadPage() {
               : f
           )
         );
+
+        if (clientShouldProcess) {
+          void fetch('/api/documents/process', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ documentId }),
+          }).catch(() => {});
+        }
 
         pollStatus(documentId, fileId);
       } catch (e) {
