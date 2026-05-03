@@ -26,7 +26,9 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
-    logger.error('Contact form error', error);
+    logger.error('Contact form error', {
+      message: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
       { error: 'Failed to submit contact form' },
       { status: 500 }

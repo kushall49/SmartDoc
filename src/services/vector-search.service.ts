@@ -1,6 +1,6 @@
 import { generateEmbeddings, cosineSimilarity } from './ai.service';
 import { logger } from '@/lib/logger';
-import DocumentModel from '@/models/Document';
+import { DocumentModel } from '@/models/Document';
 import { Embedding } from '@/types';
 
 /**

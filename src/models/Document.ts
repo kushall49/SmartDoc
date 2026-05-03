@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document as MongoDocument, model, models } from 'mongoose';
+import type { Embedding } from '@/types';
 
 export type DocumentStatus = 'pending' | 'uploading' | 'processing' | 'ready' | 'failed';
 export type DocumentType =
@@ -49,6 +50,8 @@ export interface IDocument extends MongoDocument {
   extractedText?: string;
   fraudScore?: number;
   fraudIndicators?: string[];
+  /** Chunk embeddings for semantic search / RAG */
+  embeddings?: Embedding[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -99,6 +102,14 @@ const DocumentSchema = new Schema<IDocument>(
     extractedText: { type: String, select: false },
     fraudScore: { type: Number },
     fraudIndicators: [{ type: String }],
+    embeddings: [
+      {
+        vector: [{ type: Number }],
+        model: { type: String },
+        chunkIndex: { type: Number },
+        text: { type: String },
+      },
+    ],
   },
   { timestamps: true }
 );
