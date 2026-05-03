@@ -25,10 +25,12 @@ export async function POST(request: NextRequest) {
       { success: true, message: 'Contact form submitted successfully' },
       { status: 200 }
     );
-  } catch (error) {
-    logger.error('Contact form error', {
-      message: error instanceof Error ? error.message : String(error),
-    });
+  } catch (error: unknown) {
+    const ctx: Record<string, unknown> =
+      error instanceof Error
+        ? { message: error.message, name: error.name, ...(error.stack ? { stack: error.stack } : {}) }
+        : { detail: String(error) };
+    logger.error('Contact form error', ctx);
     return NextResponse.json(
       { error: 'Failed to submit contact form' },
       { status: 500 }
