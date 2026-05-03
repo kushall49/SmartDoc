@@ -5,6 +5,16 @@ import { logger } from '@/lib/logger';
 
 export const DOCUMENT_QUEUE_NAME = 'document-processing';
 
+/**
+ * BullMQ requires a long-lived worker (`npm run worker`). Vercel has none, so jobs
+ * would sit forever. Opt in with USE_DOCUMENT_QUEUE=true when a worker shares Redis.
+ */
+function shouldUseBullMqQueue(): boolean {
+  if (process.env.USE_DOCUMENT_QUEUE === 'true') return true;
+  if (process.env.VERCEL === '1') return false;
+  return true;
+}
+
 let documentQueue: Queue | null = null;
 let documentWorker: Worker | null = null;
 
@@ -63,6 +73,24 @@ export function startDocumentProcessingWorker(): Worker {
 }
 
 export async function addDocumentToQueue(documentId: string): Promise<string> {
+  if (!shouldUseBullMqQueue()) {
+    const { after } = await import('next/server');
+    after(async () => {
+      try {
+        await processDocument(documentId);
+      } catch (err) {
+        logger.error('Serverless document processing failed', {
+          documentId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    });
+    logger.info('Document processing scheduled after response (no BullMQ worker)', {
+      documentId,
+    });
+    return `inline-${documentId}`;
+  }
+
   try {
     const queue = getDocumentQueue();
     const job = await queue.add(
@@ -77,7 +105,6 @@ export async function addDocumentToQueue(documentId: string): Promise<string> {
       documentId,
       error: String(e),
     });
-    // Fallback: process directly if Redis is unavailable
     void processDocument(documentId).catch((err) =>
       logger.error('Inline processing failed', {
         documentId,
@@ -93,6 +120,10 @@ export async function getJobStatus(jobId: string): Promise<{
   progress: number;
   error?: string;
 }> {
+  if (jobId.startsWith('inline-')) {
+    return { status: 'active', progress: 0 };
+  }
+
   try {
     const queue = getDocumentQueue();
     const job = await queue.getJob(jobId);
