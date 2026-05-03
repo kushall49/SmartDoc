@@ -6,7 +6,14 @@ import { Brain, Loader2, AlertCircle, Lightbulb, Network, Clock } from 'lucide-r
 type Mode = 'full-analysis' | 'cluster' | 'entity-timeline';
 
 interface Insight { title: string; description: string; relatedDocuments?: string[] }
-interface Cluster { name: string; documentIds: string[]; commonThemes: string[] }
+/** Matches API clusters (`theme`/`documents`) and legacy UI shape (`name`/`documentIds`). */
+interface Cluster {
+  name?: string;
+  theme?: string;
+  documentIds?: string[];
+  documents?: string[] | Array<{ id: string; name: string }>;
+  commonThemes?: string[];
+}
 interface EntityTimeline { entity: string; appearances: Array<{ documentId: string; context: string; date?: string }> }
 
 interface IntelligenceResult {

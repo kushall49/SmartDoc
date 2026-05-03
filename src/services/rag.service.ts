@@ -1,7 +1,8 @@
 import openai, { OPENAI_CONFIG } from '@/lib/openai';
+import mongoose from 'mongoose';
 import { retrieveRelevantChunks } from './vector-search.service';
 import { logger } from '@/lib/logger';
-import ChatMessageModel from '@/models/ChatMessage';
+import { ChatMessage as ChatMessageModel } from '@/models/ChatMessage';
 
 export interface ChatContext {
   documentId: string;
@@ -71,23 +72,39 @@ ${documentContext}`,
       throw new Error('No response generated');
     }
 
-    // Save conversation to database
-    await Promise.all([
-      ChatMessageModel.create({
-        documentId: context.documentId,
-        userId: context.userId,
-        role: 'user',
-        content: message,
-        context: [],
-      }),
-      ChatMessageModel.create({
-        documentId: context.documentId,
-        userId: context.userId,
-        role: 'assistant',
-        content: assistantMessage,
-        context: relevantChunks,
-      }),
-    ]);
+    const documentOid = new mongoose.Types.ObjectId(context.documentId);
+    const userOid = new mongoose.Types.ObjectId(context.userId);
+
+    await ChatMessageModel.findOneAndUpdate(
+      { documentId: documentOid, userId: userOid },
+      {
+        $setOnInsert: {
+          title: 'Document chat',
+          totalTokensUsed: 0,
+        },
+        $push: {
+          messages: {
+            $each: [
+              {
+                role: 'user',
+                content: message,
+                createdAt: new Date(),
+              },
+              {
+                role: 'assistant',
+                content: assistantMessage,
+                createdAt: new Date(),
+                sources: relevantChunks.map((chunkText) => ({
+                  documentId: context.documentId,
+                  chunkText,
+                })),
+              },
+            ],
+          },
+        },
+      },
+      { upsert: true }
+    );
 
     logger.info('RAG chat completed', {
       documentId: context.documentId,
@@ -115,7 +132,7 @@ export async function retrieveRelevantChunksWithCitations(
 ): Promise<Array<{ chunkIndex: number; text: string; score: number }>> {
   try {
     const { generateEmbeddings, cosineSimilarity } = await import('./ai.service');
-    const DocumentModel = (await import('@/models/Document')).default;
+    const { DocumentModel } = await import('@/models/Document');
 
     const [queryEmbedding] = await generateEmbeddings([query]);
     const doc = await DocumentModel.findById(documentId).select('embeddings');
@@ -145,12 +162,13 @@ export async function getConversationHistory(
   limit = 20
 ): Promise<Array<{ role: 'user' | 'assistant'; content: string; createdAt: Date }>> {
   try {
-    const messages = await ChatMessageModel.find({ documentId, userId })
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .select('role content createdAt');
+    const chat = await ChatMessageModel.findOne({ documentId, userId })
+      .sort({ updatedAt: -1 })
+      .select('messages');
 
-    return messages.reverse().map((msg) => ({
+    if (!chat?.messages?.length) return [];
+
+    return chat.messages.slice(-limit).map((msg) => ({
       role: msg.role,
       content: msg.content,
       createdAt: msg.createdAt,
@@ -169,7 +187,7 @@ export async function clearConversationHistory(
   userId: string
 ): Promise<void> {
   try {
-    await ChatMessageModel.deleteMany({ documentId, userId });
+    await ChatMessageModel.deleteOne({ documentId, userId });
     logger.info('Conversation history cleared', { documentId, userId });
   } catch (error) {
     logger.error('Failed to clear conversation history', error as Error);
