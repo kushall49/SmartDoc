@@ -28,12 +28,23 @@ export default function SignInPage() {
         email,
         password,
         redirect: false,
+        callbackUrl,
       });
-      if (result?.error) {
-        setError('Invalid email or password. Please try again.');
-      } else {
-        router.push(callbackUrl);
+
+      if (result?.error === 'Configuration') {
+        setError(
+          'Sign-in is misconfigured on the server (check NEXTAUTH_URL and NEXTAUTH_SECRET on Vercel).'
+        );
+        return;
       }
+
+      if (result?.error || result?.ok === false) {
+        setError('Invalid email or password. Please try again.');
+        return;
+      }
+
+      router.refresh();
+      router.push(callbackUrl.startsWith('/') ? callbackUrl : '/dashboard');
     } catch {
       setError('Something went wrong. Please try again.');
     } finally {
