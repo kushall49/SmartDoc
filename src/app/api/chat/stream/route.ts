@@ -8,21 +8,12 @@ import { generateQueryEmbedding, cosineSimilarity } from '@/services/embedding.s
 import { runAI } from '@/services/model-router.service';
 import { unauthorized } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
+import { CHAT_SYSTEM, orderChunksForContext, wantsContextSynthesis } from '@/lib/chat-rag-prompt';
 import mongoose from 'mongoose';
 
 function sseChunk(data: unknown): string {
   return `data: ${JSON.stringify(data)}\n\n`;
 }
-
-const CHAT_SYSTEM = `You are a helpful, conversational, and highly intelligent document assistant. Answer questions based ONLY on the provided document context.
-
-Rules:
-1. Write naturally and conversationally, just like ChatGPT. Use well-structured paragraphs, bold text for emphasis, and bullet points where appropriate. Avoid acting like a rigid robot that just outputs dry lists. Provide comprehensive, insightful summaries.
-2. Only use information explicitly present in the context below.
-3. If the answer is not in the context, politely say: "I could not find that information in this document."
-4. You may reference specific source numbers if it's helpful (e.g., "[Source 1]"), but weave them organically into your sentences instead of aggressively appending them to every line.
-5. For financial amounts, preserve exact numbers.
-6. Format your output cleanly with markdown (headers, bolding, lists) to make it highly readable.`;
 
 function buildFallbackAnswer(message: string, hasContext: boolean): string {
   if (!hasContext) {
@@ -92,15 +83,43 @@ function answerFromContextHeuristics(message: string, context: string): string |
 
   if (passages.length === 0) return null;
 
-  // Summary requests should produce a compact overview, not repeated key-value lines.
-  if (/\b(summary|summarize|overview|brief)\b/.test(lowerQuestion)) {
-    const summaryLines = passages
-      .filter((p) => p.length > 24)
-      .slice(0, 6)
-      .filter((p, i, arr) => arr.findIndex((x) => x.toLowerCase() === p.toLowerCase()) === i)
-      .slice(0, 2);
-    if (summaryLines.length > 0) {
-      return `Quick summary from extracted text:\n- ${summaryLines.join('\n- ')}`;
+  // Summary requests: stitch multiple excerpts into one short narrative when possible.
+  if (/\b(summary|summarize|overview|brief|key\s+points?|main\s+points?)\b/.test(lowerQuestion)) {
+    const blocks = normalized.split(/\n+---\n+/).filter((b) => b.trim().length > 0);
+    const sentences: string[] = [];
+    const seen = new Set<string>();
+    const pushSentence = (s: string) => {
+      const t = s.trim();
+      if (t.length < 12) return;
+      const key = t.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      sentences.push(t);
+    };
+
+    for (const block of blocks.length > 0 ? blocks : [normalized]) {
+      const lines = block
+        .split(/\n/)
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0 && !/^\[Source\s+\d+/i.test(l));
+      const body = lines.join(' ');
+      const parts = body
+        .split(/(?<=[.!?])\s+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 12);
+      for (const p of parts) {
+        const isKey =
+          /(confidential|non-?disclosure|nda|effective|commence|start\s+date|end\s+date|expir|terminat|term|party|parties|agreement|contract|obligat|liabilit)/i.test(
+            p
+          ) || /\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}/.test(p);
+        if (isKey || sentences.length < 5) pushSentence(p);
+        if (sentences.length >= 10) break;
+      }
+      if (sentences.length >= 10) break;
+    }
+
+    if (sentences.length > 0) {
+      return `**Summary (from extracted text)**\n\n${sentences.join(' ')}\n\n_AI was unavailable; this is assembled from document snippets._`;
     }
   }
 
@@ -200,7 +219,7 @@ export async function POST(request: NextRequest) {
 
         // Compute similarity scores and rank embeddings. Use `any` here to
         // avoid strict mongoose/lean typing issues during build.
-        const ranked: Array<any> = queryEmbedding
+        const rankedSimilarity: Array<any> = queryEmbedding
           ? (embeddings as any[])
               .reduce((acc: any[], e: any) => {
                 const sim = cosineSimilarity(queryEmbedding as number[], e.embedding);
@@ -213,7 +232,7 @@ export async function POST(request: NextRequest) {
 
         // Fallback retrieval: when semantic index is unavailable, use raw extracted text
         // from the selected document so users can still ask basic questions.
-        if (ranked.length === 0 && documentId && !crossDocument) {
+        if (rankedSimilarity.length === 0 && documentId && !crossDocument) {
           const docWithText = await DocumentModel.findOne({
             _id: new mongoose.Types.ObjectId(documentId),
             userId,
@@ -226,18 +245,24 @@ export async function POST(request: NextRequest) {
             const passages = selectRelevantPassages(fallbackText, message, 6);
             const snippets = passages.length > 0 ? passages : [fallbackText.slice(0, 500)];
             snippets.forEach((snippet, idx) => {
-              ranked.push({
+              rankedSimilarity.push({
                 documentId: docWithText!._id,
                 chunkText: snippet.slice(0, 700),
                 pageNumber: idx + 1,
                 similarity: 0.55 - idx * 0.05,
-              } as unknown as (typeof ranked)[number]);
+              } as unknown as (typeof rankedSimilarity)[number]);
             });
           }
         }
 
+        const rankedForPrompt = orderChunksForContext(
+          rankedSimilarity,
+          message,
+          Boolean(crossDocument)
+        );
+
         // Fetch document names for citations
-        const docIds = [...new Set(ranked.map((e) => e.documentId.toString()))];
+        const docIds = [...new Set(rankedSimilarity.map((e) => e.documentId.toString()))];
         const docNames: Record<string, string> = {};
         if (docIds.length > 0) {
           const docs = await DocumentModel.find({ _id: { $in: docIds } })
@@ -248,7 +273,7 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        const citations = ranked.slice(0, 3).map((e) => ({
+        const citations = rankedSimilarity.slice(0, 3).map((e) => ({
           documentId: e.documentId.toString(),
           documentName: docNames[e.documentId.toString()] ?? 'Document',
           chunkText: e.chunkText.slice(0, 300),
@@ -259,9 +284,8 @@ export async function POST(request: NextRequest) {
         // Send citations first
         send({ type: 'citations', citations });
 
-        // Build context
-        const context = ranked
-          .slice(0, 30)
+        // Build context (reading order for synthesis questions; similarity-ranked citations above)
+        const context = rankedForPrompt
           .map(
             (e, i) =>
               `[Source ${i + 1}${crossDocument ? ` from "${docNames[e.documentId.toString()]}"` : ''}${e.pageNumber ? ` p.${e.pageNumber}` : ''}]\n${e.chunkText}`
@@ -269,7 +293,9 @@ export async function POST(request: NextRequest) {
           .join('\n\n---\n\n');
 
         const userContent = context
-          ? `Context:\n${context}\n\nQuestion: ${message}`
+          ? wantsContextSynthesis(message)
+            ? `The excerpts below may appear in reading order. Synthesize related facts (e.g. confidentiality and term dates) into one clear answer rather than repeating each snippet in isolation.\n\nContext:\n${context}\n\nQuestion: ${message}`
+            : `Context:\n${context}\n\nQuestion: ${message}`
           : message;
 
         const hasAiProvider =
@@ -298,7 +324,7 @@ export async function POST(request: NextRequest) {
             else {
               const heuristic = answerFromContextHeuristics(message, context);
               const fallback =
-                heuristic ?? buildFallbackAnswer(message, ranked.length > 0);
+                heuristic ?? buildFallbackAnswer(message, rankedSimilarity.length > 0);
               send({ type: 'token', token: fallback });
             }
           } catch (aiError) {
@@ -307,13 +333,13 @@ export async function POST(request: NextRequest) {
             });
             const heuristic = answerFromContextHeuristics(message, context);
             const fallback =
-              heuristic ?? buildFallbackAnswer(message, ranked.length > 0);
+              heuristic ?? buildFallbackAnswer(message, rankedSimilarity.length > 0);
             send({ type: 'token', token: fallback });
           }
         } else {
           const heuristic = answerFromContextHeuristics(message, context);
           const fallback =
-            heuristic ?? buildFallbackAnswer(message, ranked.length > 0);
+            heuristic ?? buildFallbackAnswer(message, rankedSimilarity.length > 0);
           send({ type: 'token', token: fallback });
         }
 

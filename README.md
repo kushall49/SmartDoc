@@ -1,183 +1,219 @@
-# SmartDocIQ
+﻿<p align="center">
+  <img src="public/smartdoc-logo.svg" width="64" alt="SmartDoc Logo" />
+</p>
 
-**AI Document Intelligence Platform** - Extract, Analyze, and Chat with Your Documents
+<h1 align="center">SmartDoc</h1>
+<p align="center"><strong>AI-Powered Document Intelligence Platform</strong></p>
 
-[![Next.js](https://img.shields.io/badge/Next.js-15.0-black)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue)](https://www.typescriptlang.org/)
-[![MongoDB](https://img.shields.io/badge/MongoDB-6.3-green)](https://www.mongodb.com/)
-[![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4-orange)](https://openai.com/)
+<p align="center">
+  Upload documents → extract text via OCR → analyze with GPT-4o &amp; Claude → search semantically → chat with RAG
+</p>
 
-## 🚀 Features
-
-- **📄 Document Upload**: Support for PDFs, images, invoices, contracts, and more
-- **🔍 OCR Processing**: Extract text from images and scanned documents
-- **🤖 AI Analysis**: 
-  - Intelligent summarization
-  - Entity extraction (names, dates, amounts, IDs, etc.)
-  - Document type classification
-  - Anomaly and fraud detection
-- **🧠 Semantic Search**: Find documents using natural language queries
-- **💬 RAG Chat**: Chat with your documents using Retrieval-Augmented Generation
-- **☁️ Cloud Storage**: Secure file storage with AWS S3
-- **⚡ Background Processing**: Asynchronous document processing with job queues
-- **🎨 Modern UI**: Clean interface built with Next.js 15 and ShadCN
-
-## 🏗️ Architecture
-
-```
-SmartDocIQ/
-├── src/
-│   ├── app/              # Next.js 15 App Router
-│   ├── components/       # React components (ShadCN)
-│   ├── lib/             # Core utilities and configurations
-│   ├── models/          # MongoDB schemas
-│   ├── services/        # AI services (OCR, NLP, embeddings)
-│   ├── types/           # TypeScript type definitions
-│   └── utils/           # Helper functions
-├── public/              # Static assets
-└── tests/              # Test suites
-```
-
-## 🛠️ Tech Stack
-
-**Frontend:**
-- Next.js 15 (App Router)
-- React 19
-- TypeScript
-- Tailwind CSS
-- ShadCN UI Components
-
-**Backend:**
-- Next.js API Routes
-- MongoDB + Mongoose
-- BullMQ (Job Queue)
-- Redis
-
-**AI/ML:**
-- OpenAI GPT-4 (Summarization, Entity Extraction, Classification)
-- OpenAI Embeddings (Semantic Search)
-- Tesseract.js (OCR)
-- RAG (Retrieval-Augmented Generation)
-
-**Infrastructure:**
-- AWS S3 (File Storage)
-- NextAuth.js (Authentication)
-
-## 📋 Prerequisites
-
-- Node.js >= 18.17.0
-- MongoDB
-- Redis
-- AWS Account (for S3)
-- OpenAI API Key
-
-## 🚀 Getting Started
-
-### 1. Clone and Install
-
-```bash
-git clone <your-repo>
-cd smartdociq
-npm install
-```
-
-### 2. Configure Environment
-
-Copy `.env.example` to `.env` and fill in your credentials:
-
-```bash
-cp .env.example .env
-```
-
-### 3. Start Development Server
-
-```bash
-npm run dev
-```
-
-Visit [http://localhost:3000](http://localhost:3000)
-
-## 🧪 Testing
-
-```bash
-# Run unit tests
-npm test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Run E2E tests
-npm run e2e
-
-# Generate coverage report
-npm run test:coverage
-```
-
-## 📚 API Documentation
-
-### Upload Document
-```
-POST /api/documents/upload
-Content-Type: multipart/form-data
-```
-
-### Process Document
-```
-POST /api/documents/process
-Body: { documentId: string }
-```
-
-### Search Documents
-```
-GET /api/documents/search?q=query
-```
-
-### Chat with Document
-```
-POST /api/chat
-Body: { documentId: string, message: string }
-```
-
-## 🎯 Use Cases
-
-- **Invoice Processing**: Extract vendor names, amounts, dates
-- **Contract Analysis**: Identify key terms and parties
-- **Resume Screening**: Extract skills, experience, education
-- **Report Summarization**: Generate executive summaries
-- **Compliance Checking**: Detect anomalies and missing information
-
-## 📈 Performance
-
-- Async processing with job queues
-- Vector search for fast semantic retrieval
-- Optimized embeddings storage
-- Caching strategies for repeated queries
-
-## 🔒 Security
-
-- Secure file uploads with validation
-- Rate limiting on API endpoints
-- Authentication with NextAuth.js
-- Encrypted data transmission
-- Role-based access control
-
-## 🤝 Contributing
-
-This is a portfolio project. Feel free to fork and customize for your needs.
-
-## 📄 License
-
-MIT License - feel free to use this project for learning and portfolio purposes.
-
-## 👤 Author
-
-Built by Kushal L as a portfolio project showcasing:
-- Full-stack development
-- AI/ML integration
-- Cloud architecture
-- Modern web technologies
+<p align="center">
+  <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-15-black?logo=next.js" alt="Next.js"></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.3-3178C6?logo=typescript&logoColor=white" alt="TypeScript"></a>
+  <a href="https://www.mongodb.com/"><img src="https://img.shields.io/badge/MongoDB-7-47A248?logo=mongodb&logoColor=white" alt="MongoDB"></a>
+  <a href="https://openai.com/"><img src="https://img.shields.io/badge/OpenAI-GPT--4o-412991?logo=openai&logoColor=white" alt="OpenAI"></a>
+  <a href="https://www.anthropic.com/"><img src="https://img.shields.io/badge/Anthropic-Claude_3.5-D97706" alt="Anthropic"></a>
+  <a href="https://aws.amazon.com/s3/"><img src="https://img.shields.io/badge/AWS-S3-FF9900?logo=amazon-aws&logoColor=white" alt="AWS S3"></a>
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
+</p>
 
 ---
 
-⭐ If this project helps you, consider giving it a star!
+## What It Does
 
+Businesses drown in unstructured documents — contracts, invoices, scanned forms, reports. SmartDoc turns them into structured, searchable, conversational knowledge.
+
+You upload a PDF or image. SmartDoc extracts the text (OCR for scans), identifies entities (names, dates, amounts), classifies the document type, flags anomalies, and stores vector embeddings for semantic search. You can then run natural language searches across all your documents, or open a chat interface and ask questions — answered using Retrieval-Augmented Generation grounded in the actual document content.
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Client (Next.js 15)                         │
+│          Upload  ·  Dashboard  ·  Search  ·  RAG Chat               │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │ HTTP / SSE (streaming chat)
+┌──────────────────────────────▼──────────────────────────────────────┐
+│                     Next.js API Routes                              │
+│   /upload  ·  /process  ·  /search  ·  /chat  ·  /analytics        │
+│                                                                     │
+│  ┌─────────────────┐    ┌──────────────────────────────────────┐   │
+│  │  BullMQ Queue   │    │         Smart Model Router           │   │
+│  │  (Redis-backed) │    │  Complexity → GPT-4o-mini / GPT-4o   │   │
+│  │  Async + retry  │    │            / Claude 3.5 Sonnet       │   │
+│  └────────┬────────┘    └──────────────────┬───────────────────┘   │
+└───────────┼──────────────────────────────── ┼──────────────────────┘
+            │                                 │
+            ▼                                 ▼
+┌───────────────────────┐       ┌─────────────────────────────────┐
+│   Document Pipeline   │       │        AI Services              │
+│                       │       │                                 │
+│  1. OCR (Tesseract /  │       │  • Summarization                │
+│     AWS Textract)     │──────▶│  • Entity extraction            │
+│  2. Text chunking     │       │  • Classification               │
+│  3. Embedding (OpenAI │       │  • Anomaly / fraud detection    │
+│     text-embedding-   │       │  • RAG chat (vector + LLM)      │
+│     3-large)          │       └────────────────┬────────────────┘
+│  4. Vector storage    │                        │
+└───────────┬───────────┘                        │
+            │                                    │
+            ▼                                    ▼
+┌───────────────────────────────────────────────────────────────────┐
+│                        Storage Layer                              │
+│   MongoDB (metadata · embeddings · usage logs)   AWS S3 (files)  │
+└───────────────────────────────────────────────────────────────────┘
+```
+
+### Key Design Decisions
+
+| Decision | Why |
+|---|---|
+| **Multi-provider AI routing** | Simple tasks → GPT-4o-mini (8× cheaper). Long contracts → Claude 3.5 Sonnet (200K context). The router picks automatically based on document complexity and task type. |
+| **BullMQ over synchronous processing** | Document pipelines can take 5–30s. Queueing decouples upload from processing, gives automatic retry with exponential backoff, and keeps API response times under 200ms. |
+| **Vector embeddings in MongoDB** | Keeps the embedding store collocated with document metadata — no separate vector DB to operate. Cosine similarity search via Atlas Vector Search or a pure JS fallback in dev. |
+| **Next.js App Router for everything** | Unified codebase for frontend + API. Server Components reduce client JS. Route Handlers replace a separate Express server. |
+| **SSE streaming for chat** | RAG chat responses stream token-by-token over Server-Sent Events, giving users instant feedback without a WebSocket infrastructure requirement. |
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| **Frontend** | Next.js 15 (App Router), React 18, TypeScript, Tailwind CSS, ShadCN UI |
+| **Backend** | Next.js Route Handlers, Mongoose / MongoDB, BullMQ, Redis |
+| **AI / ML** | OpenAI GPT-4o + text-embedding-3-large, Anthropic Claude 3.5 Sonnet, Tesseract.js OCR |
+| **Storage** | AWS S3 (production), local filesystem fallback (development) |
+| **Auth** | NextAuth.js (credentials + session management) |
+| **DevOps** | Docker Compose (app + worker + mongo + redis), Vercel (serverless deployment) |
+| **Testing** | Jest + React Testing Library (unit), Playwright (E2E) |
+
+---
+
+## Features
+
+- **Document Upload** — PDF, PNG, JPG, DOCX; up to 10 MB; validated server-side
+- **OCR** — Tesseract.js for client-side processing; AWS Textract available via env flag
+- **AI Analysis** — summarization, entity extraction (names / dates / amounts), document classification, anomaly detection
+- **Smart Model Router** — selects GPT-4o-mini / GPT-4o / Claude based on document length and task type; tracks cost per request
+- **Semantic Search** — natural language queries against vector embeddings; returns ranked results with relevance scores
+- **RAG Chat** — streaming chat interface grounded in retrieved document chunks; maintains conversation history
+- **Analytics Dashboard** — real-time usage logs, per-provider cost breakdown, token consumption
+- **Audit Log** — append-only log of all AI operations per document
+- **Rate Limiting** — sliding window rate limit on all API routes
+
+---
+
+## Local Setup
+
+### Prerequisites
+
+- Node.js ≥ 18.17
+- MongoDB (local or Atlas)
+- Redis (local or Upstash)
+- OpenAI API key
+- Anthropic API key (optional but enables full routing)
+- AWS credentials (optional; local storage fallback works without them)
+
+### Quickstart
+
+```bash
+# 1. Clone
+git clone https://github.com/kushall49/SmartDoc.git
+cd SmartDoc
+
+# 2. Install
+npm install
+
+# 3. Configure
+cp .env.example .env
+# Edit .env and fill in your keys
+
+# 4. Start
+npm run dev
+# → http://localhost:3000
+```
+
+### Docker (full stack in one command)
+
+```bash
+cp .env.example .env   # fill in API keys
+docker compose up --build
+```
+
+Starts: Next.js app, BullMQ worker, MongoDB, Redis — all with health checks.
+
+---
+
+## Running Tests
+
+```bash
+# Unit + integration tests
+npm test
+
+# With coverage report
+npm run test:coverage
+
+# End-to-end (Playwright) — requires the dev server to be running
+npm run e2e
+
+# All at once
+npm run test:all
+```
+
+---
+
+## API Reference
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/documents/upload` | Upload a document (multipart/form-data) |
+| `POST` | `/api/documents/process` | Trigger AI processing for a document |
+| `GET` | `/api/documents` | List all documents for the authenticated user |
+| `DELETE` | `/api/documents/:id` | Delete a document and its embeddings |
+| `GET` | `/api/search?q=` | Semantic search across all documents |
+| `POST` | `/api/chat` | Send a chat message (returns full response) |
+| `POST` | `/api/chat/stream` | Send a chat message (SSE streaming) |
+| `GET` | `/api/analytics` | AI usage statistics and cost breakdown |
+| `GET` | `/api/audit/:documentId` | Audit log for a specific document |
+| `GET` | `/api/health` | Health check (uptime, DB, Redis status) |
+
+---
+
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── api/              # Route Handlers (upload, process, search, chat, analytics…)
+│   ├── dashboard/        # Protected pages (documents, search, chat, analytics)
+│   └── page.tsx          # Public landing page
+├── components/           # React components (FileUpload, ChatInterface, SearchBar…)
+├── services/             # Business logic
+│   ├── model-router.service.ts      # Smart AI provider selection
+│   ├── ai-enhanced.service.ts       # Multi-provider AI calls
+│   ├── rag.service.ts               # Retrieval-Augmented Generation
+│   ├── embedding.service.ts         # Vector embedding generation
+│   ├── vector-search.service.ts     # Cosine similarity search
+│   ├── document-processor.service.ts
+│   ├── ocr.service.ts
+│   └── s3.service.ts
+├── models/               # Mongoose schemas (Document, User, Chat, Embedding, UsageLog)
+├── lib/                  # Config, auth, DB connection, rate limiter, logger
+├── types/                # TypeScript interfaces
+└── worker.ts             # BullMQ worker process entry point
+```
+
+---
+
+## License
+
+MIT — free to fork, learn from, or build on.
+
+---
+
+<p align="center">Built by <a href="https://github.com/kushall49">Kushal</a></p>

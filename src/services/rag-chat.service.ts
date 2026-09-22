@@ -5,6 +5,11 @@ import { runAI } from '@/services/model-router.service';
 import { generateQueryEmbedding, cosineSimilarity } from '@/services/embedding.service';
 import { connectDB } from '@/lib/db';
 import { logger } from '@/lib/logger';
+import {
+  CHAT_SYSTEM,
+  orderChunksForContext,
+  wantsContextSynthesis,
+} from '@/lib/chat-rag-prompt';
 import mongoose from 'mongoose';
 
 export interface ChatSource {
@@ -23,16 +28,6 @@ export interface RagChatResult {
   model: string;
   chatId: string;
 }
-
-const CHAT_SYSTEM = `You are a helpful, conversational, and highly intelligent document assistant. Answer questions based ONLY on the provided document context.
-
-Rules:
-1. Write naturally and conversationally, just like ChatGPT. Use well-structured paragraphs, bold text for emphasis, and bullet points where appropriate. Avoid acting like a rigid robot that just outputs dry lists. Provide comprehensive, insightful summaries.
-2. Only use information explicitly present in the context below.
-3. If the answer is not in the context, politely say: "I could not find that information in this document."
-4. You may reference specific source numbers if it's helpful (e.g., "[Source 1]"), but weave them organically into your sentences instead of aggressively appending them to every line.
-5. For financial amounts, preserve exact numbers.
-6. Format your output cleanly with markdown (headers, bolding, lists) to make it highly readable.`;
 
 export async function ragChat(
   question: string,
@@ -90,7 +85,7 @@ export async function ragChat(
   }
 
   // Rank chunks by similarity
-  const ranked = embeddings
+  const rankedSimilarity = embeddings
     .map((e) => ({
       ...e,
       similarity: cosineSimilarity(queryEmbedding, e.embedding),
@@ -98,10 +93,12 @@ export async function ragChat(
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, 30);
 
+  const rankedForPrompt = orderChunksForContext(rankedSimilarity, question, false);
+
   const doc = await DocumentModel.findById(documentId).select('name').lean();
   const docName = doc?.name ?? 'Document';
 
-  const sources: ChatSource[] = ranked
+  const sources: ChatSource[] = rankedSimilarity
     .filter((e) => e.similarity > 0.25)
     .map((e) => ({
       documentId,
@@ -112,8 +109,7 @@ export async function ragChat(
     }));
 
   // Build context from top chunks
-  const context = ranked
-    .slice(0, 30)
+  const context = rankedForPrompt
     .map(
       (e, i) =>
         `[Source ${i + 1}${e.pageNumber ? ` - Page ${e.pageNumber}` : ''}]\n${e.chunkText}`
@@ -126,8 +122,12 @@ export async function ragChat(
     .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
     .join('\n');
 
+  const synthesisNote = wantsContextSynthesis(question)
+    ? 'The excerpts may be ordered by page. Synthesize related facts into one coherent answer.\n\n'
+    : '';
+
   const userPrompt = [
-    context ? `Document context:\n${context}` : '',
+    context ? `${synthesisNote}Document context:\n${context}` : '',
     historyText ? `\nPrevious conversation:\n${historyText}` : '',
     `\nQuestion: ${question}`,
   ]

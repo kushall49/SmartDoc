@@ -1,9 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState, FormEvent, useCallback } from 'react';
+import { useEffect, useRef, useState, FormEvent, useCallback, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { Send, Loader2, Globe, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { marked } from 'marked';
+import DOMPurify from 'isomorphic-dompurify';
 import { cn } from '@/lib/utils';
+
+marked.setOptions({ gfm: true, breaks: true });
 
 interface Source {
   documentId: string;
@@ -41,10 +45,37 @@ function SourceCard({ source }: { source: Source }) {
 function MessageBubble({ msg }: { msg: Message }) {
   const [showSrc, setShowSrc] = useState(false);
   const isUser = msg.role === 'user';
+
+  const assistantHtml = useMemo(() => {
+    if (isUser || !msg.content.trim()) return null;
+    try {
+      const raw = marked.parse(msg.content, { async: false }) as string;
+      return DOMPurify.sanitize(raw);
+    } catch {
+      return null;
+    }
+  }, [isUser, msg.content]);
+
   return (
     <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
       <div className={cn('max-w-[80%] rounded-2xl px-4 py-3', isUser ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-100')}>
-        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+        {isUser ? (
+          <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+        ) : assistantHtml ? (
+          <div
+            className={cn(
+              'text-sm prose-invert max-w-none',
+              '[&_p]:mb-2 last:[&_p]:mb-0 [&_ul]:my-2 [&_ol]:my-2 [&_li]:my-0.5',
+              '[&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4',
+              '[&_strong]:font-semibold [&_a]:text-indigo-400 [&_a]:underline',
+              '[&_h1]:text-base [&_h1]:font-bold [&_h1]:mb-2 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1.5',
+              '[&_code]:text-indigo-200 [&_code]:bg-slate-900/80 [&_code]:px-1 [&_code]:rounded'
+            )}
+            dangerouslySetInnerHTML={{ __html: assistantHtml }}
+          />
+        ) : (
+          <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+        )}
         {!isUser && msg.isStreaming && <span className="inline-block w-1.5 h-4 bg-slate-400 animate-pulse ml-0.5 align-middle" />}
         {!isUser && msg.provider && !msg.isStreaming && (
           <p className="text-xs text-slate-500 mt-1">{msg.provider} · {msg.model}{msg.tokensUsed ? ` · ${msg.tokensUsed} tokens` : ''}</p>
