@@ -3,7 +3,7 @@
  */
 import { NextRequest } from 'next/server';
 import { POST as registerHandler } from '@/app/api/auth/register/route';
-import UserModel from '@/models/User';
+import { User as UserModel } from '@/models/User';
 import bcrypt from 'bcryptjs';
 
 // Mock dependencies
