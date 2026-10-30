@@ -13,7 +13,8 @@ SmartDocIQ is a production-grade, interview-ready **Enterprise Document Intellig
 
 ## 🏛️ Monorepo Architecture
 
-SmartDocIQ is decoupled into a clean, interview-ready monorepo separating API services from frontend client concerns:
+SmartDocIQ is decoupled into a clean,  monorepo separating API services from frontend client concerns:
+
 
 ```
 SmartDoc/
@@ -40,6 +41,8 @@ SmartDoc/
 ├── .gitignore                # Excludes secrets, uploads, IDEs & tooling (.agents, .cursor, .github)
 └── README.md
 ```
+<img width="1496" height="1600" alt="image" src="https://github.com/user-attachments/assets/dfecdcb2-dc2f-4106-b93e-3abfd6144f62" />
+
 
 ---
 
@@ -173,22 +176,10 @@ This verifies:
 3. OpenAI embedding generation and GPT-4o completions.
 4. Tenant-isolated local file storage on disk.
 5. Ingestion pipeline (OCR, chunking, and metadata parsing).
+
 6. Express REST API endpoints and SSE streaming headers.
 7. JWT authentication and password hashing.
 8. Frontend Vite compilation and component availability.
-
----
-
-## 📜 Architectural Decisions (Interview FAQ)
-
-* **Why Express instead of Next.js Route Handlers?**
-  Next.js serverless functions have strict execution timeout limits (15–60s) and buffer HTTP responses, making true long-running Server-Sent Events (SSE) token streaming fragile. A dedicated Express server provides full lifecycle control over `res.flushHeaders()`, socket disconnect events (`res.on('close')`), and allows backend scaling independent of frontend assets.
-
-* **Why native `pgvector` over dedicated vector databases (Pinecone / Milvus)?**
-  `pgvector` eliminates dual-database consistency issues. Relational data (users, documents, chats) and high-dimensional vector embeddings reside in the exact same ACID-compliant PostgreSQL database, allowing atomic transactions, foreign keys, and multi-tenant isolation in a single query.
-
-* **How does SmartDocIQ handle OpenAI quota exhaustion?**
-  SmartDocIQ implements deterministic unit-vector generation and localized grounded synthesis fallback. If an OpenAI API key hits a rate limit or runs out of credits, the system gracefully continues ingesting documents and streaming answers directly from the verified text.
 
 ---
 
