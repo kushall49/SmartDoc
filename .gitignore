@@ -1,49 +1,43 @@
-﻿# ── Dependencies ──────────────────────────────────────────────────────────────
-/node_modules
-/.pnp
+# ── Dependencies ──────────────────────────────────────────────────────────────
+node_modules/
+*/node_modules/
+.pnp
 .pnp.js
 
-# ── Next.js ───────────────────────────────────────────────────────────────────
-/.next/
-/out/
-/build
-next-env.d.ts
-
-# ── TypeScript ────────────────────────────────────────────────────────────────
+# ── Build Outputs ─────────────────────────────────────────────────────────────
+dist/
+*/dist/
+build/
+.next/
+.swc/
 *.tsbuildinfo
 
-# ── Testing & Coverage ────────────────────────────────────────────────────────
-/coverage
-/playwright-report
-/test-results
-
-# ── Environment / Secrets ─────────────────────────────────────────────────────
+# ── Environment & Secrets ─────────────────────────────────────────────────────
 .env
-.env*.local
+.env.*
+!.env.example
 *.pem
 
-# ── Uploads & generated content ───────────────────────────────────────────────
-/uploads
-/temp
-/public/uploads
-/public/test-files
+# ── Local Uploads & Storage ───────────────────────────────────────────────────
+uploads/
+*/uploads/
+!uploads/.gitkeep
+!backend/uploads/.gitkeep
 
-# ── Debug logs ────────────────────────────────────────────────────────────────
+# ── Debug Logs ────────────────────────────────────────────────────────────────
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.log
 
-# ── Misc ──────────────────────────────────────────────────────────────────────
+# ── Misc & System ─────────────────────────────────────────────────────────────
 .DS_Store
+Thumbs.db
 
-# ── IDE / Editor ──────────────────────────────────────────────────────────────
-.vscode
-.idea
-.cursor
-
-# ── Vercel ────────────────────────────────────────────────────────────────────
-.vercel
-
-# ── AI tooling (not project code) ─────────────────────────────────────────────
-skills-lock.json
+# ── IDEs, Tooling & Hidden Folders ────────────────────────────────────────────
+.vscode/
+.idea/
+.cursor/
 .agents/
+.github/
+skills-lock.json

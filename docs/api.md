@@ -1,74 +1,70 @@
-# API Notes
+# SmartDocIQ API Reference
 
-Quick reference for the API routes.
+Base URL: `http://localhost:4000/api`
 
-## Auth
+All endpoints except `/auth/login`, `/auth/register`, `/health`, and `/documents/public/:id` require authentication via `Authorization: Bearer <token>` or `smartdoc_token` httpOnly cookie.
 
-All dashboard routes require a valid NextAuth session. Pass the session cookie — endpoints return 401 if missing.
+---
 
-## Documents
+## Authentication (`/api/auth`)
 
-**Upload**
-```
-POST /api/documents/upload
-Content-Type: multipart/form-data
+- `POST /register`: Register a new user (`name`, `email`, `password`).
+- `POST /login`: Authenticate with email and password; returns JWT token and user profile.
+- `POST /logout`: Clears session cookie.
+- `GET /me`: Returns current authenticated user record.
 
-file: <the file>
-```
-Returns the document ID. Processing happens async — poll `/api/documents/:id/status` to check.
+---
 
-**Process (trigger manually)**
-```
-POST /api/documents/process
-{ "documentId": "..." }
-```
-Useful if the worker missed the job or you want to reprocess.
+## Documents (`/api/documents`)
 
-**List**
-```
-GET /api/documents
-```
-Returns all docs for the logged-in user.
+- `GET /`: List all documents belonging to the authenticated user.
+- `POST /upload`: Upload file (multipart form field `file`; max 10 MB). Enqueues BullMQ worker job.
+- `GET /:id`: Retrieve document metadata, extracted entities, summary, and anomalies.
+- `DELETE /:id`: Deletes document from PostgreSQL and local disk.
+- `GET /:id/status`: Poll document processing status (`pending`, `processing`, `ready`, `failed`).
+- `POST /compare`: Semantic comparison between two documents (`documentId1`, `documentId2`).
+- `POST /:id/vision`: OpenAI GPT-4o Vision analysis for image files (`ocr`, `diagram`, `table`, `full-analysis`).
+- `GET /:id/export`: Export document content as `json`, `csv`, or `text`.
+- `POST /:id/share`: Generate public share link (`/share/:id`).
+- `GET /public/:id`: Public unauthenticated read-only endpoint for shared documents.
 
-**Delete**
-```
-DELETE /api/documents/:id
-```
-Deletes doc, all its embeddings, and the S3 file.
+---
 
-## Search
+## Chat (`/api/chat`)
 
-```
-GET /api/search?q=your+query&limit=10
-```
-Embeds the query, runs cosine similarity against all your docs, returns ranked results with scores.
+- `POST /stream`: Server-Sent Events (SSE) streaming endpoint.
+  - Body: `{ message, documentId?, crossDocument?, chatId? }`
+  - Emits:
+    - `data: {"type": "sources", "sources": [...]}`
+    - `data: {"type": "token", "token": "..."}`
+    - `data: {"type": "done", "fullAnswer": "..."}`
+- `POST /`: Non-streaming completion endpoint.
+- `GET /history/:documentId`: Retrieve message history for document chat.
 
-## Chat
+---
 
-**Streaming (recommended)**
-```
-POST /api/chat/stream
-{ "chatId": "...", "message": "..." }
-```
-Returns SSE stream. Each event is a text chunk.
+## Search (`/api/search`)
 
-**Non-streaming**
-```
-POST /api/chat
-{ "chatId": "...", "message": "..." }
-```
-Waits for full response — slower but simpler to work with.
+- `GET /?q=...&limit=15&type=...&from=...&to=...`:
+  - 1536-d cosine vector similarity search powered by `pgvector`.
+  - Filterable by document type, date range, and minimum similarity threshold.
 
-## Analytics
+---
 
-```
-GET /api/analytics
-```
-Returns token usage, cost, and request counts grouped by AI provider.
+## Cross-Document Intelligence (`/api/intelligence`)
 
-## Health
+- `POST /`: Multi-document synthesis across tenant repository. Discovers contradictions, recurring themes, and compliance flags.
 
-```
-GET /api/health
-```
-Returns app uptime + DB + Redis connection status. Good for monitoring.
+---
+
+## Audit & Analytics (`/api/audit`)
+
+- `GET /`: Retrieve recent immutable audit trail entries.
+- `GET /analytics`: Aggregated token usage counts (prompt, completion, total) and estimated USD costs.
+- `GET /export?format=csv|json`: Export audit log history.
+
+---
+
+## System (`/api/health`)
+
+- `GET /`: System health check (database connectivity, uptime, version).

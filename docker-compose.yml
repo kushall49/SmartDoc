@@ -1,69 +1,29 @@
 version: '3.8'
 
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: smartdociq-postgres
     ports:
-      - "3000:3000"
-    env_file: .env
+      - "5432:5432"
     environment:
-      - NODE_ENV=production
-      - REDIS_HOST=redis
-      - MONGODB_URI=mongodb://mongo:27017/smartdociq
-    depends_on:
-      mongo:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: npm run worker
-    env_file: .env
-    environment:
-      - NODE_ENV=production
-      - REDIS_HOST=redis
-      - MONGODB_URI=mongodb://mongo:27017/smartdociq
-      - USE_DOCUMENT_QUEUE=true
-    depends_on:
-      mongo:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
-  mongo:
-    image: mongo:7-jammy
-    ports:
-      - "27017:27017"
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: smartdociq
     volumes:
-      - mongo_data:/data/db
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
 
   redis:
     image: redis:7-alpine
+    container_name: smartdociq-redis
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
+      - redisdata:/data
     restart: unless-stopped
 
 volumes:
-  mongo_data:
-  redis_data:
+  pgdata:
+  redisdata:
+

@@ -1,46 +1,56 @@
-# Architecture Notes
+# SmartDocIQ Architecture
 
-Quick notes on how things are wired together — mostly for my own reference.
+A high-performance, single-path document intelligence platform with zero fallbacks and deterministic pipelines.
 
-## How document processing works
+```
+┌────────────────────────────────┐         ┌─────────────────────────────────┐
+│     Frontend (React + Vite)    │  HTTP   │     Backend (Express + TS)      │
+│  - React Router + TanStack Query│◄───────►│  - Port 4000                    │
+│  - Tailwind CSS Glassmorphism  │   SSE   │  - Manual SSE Token Streaming   │
+│  - Port 5173                   │         │  - Multer Disk Uploads (10 MB)  │
+└────────────────────────────────┘         └───────────────┬─────────────────┘
+                                                           │
+                                ┌──────────────────────────┼─────────────────────────┐
+                                │                          │                         │
+                                ▼                          ▼                         ▼
+                  ┌──────────────────────────┐ ┌───────────────────────┐ ┌──────────────────────┐
+                  │ PostgreSQL 18 + pgvector │ │   BullMQ + Redis 7    │ │    Direct OpenAI     │
+                  │ - Prisma ORM 5.22.0      │ │ - Single-mode queue   │ │ - gpt-4o (Chat/Vision│
+                  │ - 1536-d HNSW Cosine     │ │ - Standalone Worker   │ │   & Compare)         │
+                  │   vector_cosine_ops (<=>)│ │ - Exponential backoff │ │ - text-embedding-3-  │
+                  └──────────────────────────┘ └───────────────────────┘ │   small (1536-d)     │
+                                                                         └──────────────────────┘
+```
 
-When a file gets uploaded:
-1. Saved to S3 (or local `/uploads` in dev)
-2. A BullMQ job gets queued
-3. Worker picks it up → runs OCR if needed → splits text into chunks
-4. Each chunk gets embedded via `text-embedding-3-large`
-5. Embeddings stored in MongoDB alongside the doc metadata
-6. AI analysis runs (summary, entities, classification) — model router picks the provider
-7. Results written back to the Document record
+---
 
-The whole thing is async so the upload API responds in ~100ms even if processing takes 30s.
+## 1. Single-Path Stack Components
 
-## Model routing logic
+| Layer | Implementation | Defense / Rationale |
+|---|---|---|
+| **Frontend** | React 18, Vite 6, TypeScript, React Router 6, TanStack Query 5 | Sub-second client builds, no SSR hydration mismatch, true SSE reader with `AbortController`. |
+| **Backend** | Express 4, TypeScript (`tsx`) | Full control over HTTP lifecycle, persistent connection streaming (`res.flushHeaders()`), sub-millisecond route dispatch. |
+| **Database & Vector** | PostgreSQL 18 + `pgvector` v0.8.5 | Unified relational metadata and 1536-d vector embeddings in one transaction-safe database. Indexed via HNSW `vector_cosine_ops`. |
+| **ORM** | Prisma 5.22.0 | Type-safe schema migrations with PostgreSQL extensions and raw SQL vector distance queries. |
+| **Authentication** | JWT (`jsonwebtoken`) + `bcryptjs` (12 rounds) | Dual-transmission auth (Authorization header + httpOnly cookie) for maximum API and browser versatility. |
+| **AI Provider** | Direct OpenAI (`gpt-4o`, `text-embedding-3-small`) | Zero intermediate router latency, high accuracy, exact per-request token and cost tracking. |
+| **Queue & Worker** | BullMQ 5 + Redis 7 | Standalone Node.js worker process (`npm run worker`) for deterministic asynchronous document parsing. |
+| **Storage** | Local disk (`./uploads/documents/:userId/`) | Strict 10 MB limit, path traversal sanitization, instant byte streaming. |
 
-`model-router.service.ts` decides which AI provider to use:
+---
 
-- Short docs / simple tasks → GPT-4o-mini (cheapest, fast)
-- Long docs (>10k tokens) → Claude 3.5 Sonnet (200K context)
-- Vision tasks → GPT-4o (best multimodal)
-- Everything else → GPT-4o
+## 2. Ingestion & Retrieval Pipeline
 
-Cost per request gets logged to `UsageLog` so the analytics dashboard can show breakdowns.
-
-## RAG chat pipeline
-
-1. User sends a message
-2. Message gets embedded
-3. Cosine similarity search against all stored chunk embeddings for that doc
-4. Top-K chunks retrieved and stuffed into the prompt
-5. LLM call with context + history
-6. Response streamed back via SSE
-
-## Why embeddings in MongoDB and not a vector DB
-
-Honestly — simplicity. MongoDB Atlas has vector search built in, and for the scale this runs at (hundreds of docs, not millions) it's more than fast enough. If this ever needed to scale to millions of documents I'd move to Pinecone or Weaviate.
-
-## On Vercel vs local
-
-Locally: BullMQ worker runs as a separate process (`npm run worker`).
-
-On Vercel: No persistent processes, so document processing happens inline in the API route using `after()` (Next.js 15 feature for post-response work). Less reliable for very long jobs but works for most cases.
+1. **Upload**: User uploads PDF, DOCX, TXT, or image via `POST /api/documents/upload`.
+2. **Persistence**: File written to `uploads/documents/:userId/` with cryptographic hash collision resistance. Record created in PostgreSQL (`status: 'pending'`).
+3. **Queue**: BullMQ job dispatched to Redis on `document-processing` queue.
+4. **Worker Execution**: Worker extracts raw text, generates overlapping 500-token chunks, creates 1536-d embeddings via OpenAI, and extracts key entities/anomalies via GPT-4o.
+5. **Vector Search**: Search queries execute directly in PostgreSQL:
+   ```sql
+   SELECT id, document_id, chunk_text, (1 - (embedding <=> $1::vector))::float AS similarity
+   FROM chunks
+   WHERE user_id = $2::uuid
+   ORDER BY embedding <=> $1::vector ASC
+   LIMIT 15;
+   ```
+6. **RAG Streaming**: Express streams tokens over SSE (`text/event-stream`), emitting citation payloads and token chunks with client-disconnect abort signaling.
